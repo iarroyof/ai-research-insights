@@ -1,0 +1,11 @@
+services:
+  corenlp:
+    command:
+      - sh
+      - -lc
+      - >
+        java -Xms4g -Xmx8g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer
+        -port 9000 -timeout 600000 -threads 4
+        -quiet true
+        -preload tokenize,ssplit,pos,lemma,depparse,natlog,openie
+        -annotators tokenize,ssplit,pos,lemma,depparse,natlog,openie

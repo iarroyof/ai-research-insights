@@ -1,0 +1,95 @@
+app:
+  name: ai-research-insights
+  env: dev
+  log_level: INFO
+  sse_heartbeat_seconds: 10
+  allow_cors_origins: []
+
+security:
+  require_api_key: true          # new (we enforce API keys)
+  api_key: dev                   # dev default; rotate in prod
+  enable_hmac: false             # was require_hmac
+  rate_limit_per_min: 120        # was rate_limit_per_minute
+
+multi_tenancy:
+  strategy: rls                  # rls|per_schema
+  default_tenant: default
+  enforce: true
+
+postgres:
+  dsn: postgresql+psycopg://postgres:postgres@postgres:5432/ai_insights
+
+opensearch:
+  endpoint: http://opensearch:9200  # was url
+  index_prefix: t_
+  use_vectors: true
+  vector_dim: 384
+  bm25_k: 50
+  vec_k: 50                          # your old opensearch.k
+  fusion_weight: 0.5                 # lived under retrieval
+
+neo4j:
+  uri: bolt://neo4j:7687
+  user: neo4j
+  password: neo4j_pass
+
+minio:
+  endpoint: http://minio:9000
+  access_key: minio
+  secret_key: minio_pass
+  bucket: papers
+
+llm:
+  base_url: http://llm:8000/v1
+  model: zephyr-7b-beta
+  max_input_tokens: 6000
+  max_output_tokens: 512
+  temperature: 0.2
+  top_p: 1.0
+
+# Relation extraction config (unifies rebel/openie/corenlp)
+re:
+  primary: rebel
+  rebel_url: "http://rebel-extractor:9007"         # from extraction.providers.rebel.base_url
+  openie6_url: "http://openie6-adapter:9006"       # from openie6.adapter_url
+  corenlp_url: "http://corenlp-adapter:9009"       # from extraction.providers.stanford.base_url
+  min_confidence: 0.10
+
+grobid:
+  url: http://grobid:8070
+  timeout_sec: 60
+
+pdf:
+  max_pages: 400
+  max_size_mb: 50
+
+# CSV thresholds (moved from triplets.thresholds)
+csv:
+  thresholds:
+    subject_ebio_min: 0.70
+    subject_ngen_min: 0.70          # new explicit default
+    object_ebio_min: 0.70
+    object_ngen_min: 0.70           # new explicit default
+    confidence_min: 0.60            # you had 0.60 under triplets.thresholds
+
+antivirus:
+  enabled: false
+  host: clamav
+  port: 3310
+  timeout_sec: 5
+
+streaming:
+  enable_sse: true
+  chunk_bytes: 2048
+
+# (Optional) kept from your old file; now explicitly supported in config.py below
+classification:
+  model_id: facebook/bart-large-mnli
+  labels: ["has biomedical entity", "has generic noun", "other"]
+  batch_size: 32
+  max_concurrency: 8
+
+export:
+  triples_csv_bucket: papers
+  triples_csv_object: triplets_export/triplets.csv
+

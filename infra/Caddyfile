@@ -1,0 +1,15 @@
+{
+    auto_https off
+}
+
+:8080 {
+    log
+
+    reverse_proxy api:8080 {
+        # Keep FastAPI happy (HTTP/1.1 upstream)
+        transport http {
+            versions 1.1
+        }
+    }
+}
+

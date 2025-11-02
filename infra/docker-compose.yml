@@ -1,0 +1,148 @@
+version: "3.9"
+
+services:
+  caddy:
+    image: caddy:2
+    ports: ["8080:8080", "8443:8443"]
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+  api:
+    build: ./services/api
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+    volumes:
+      - ./services/api:/app
+      - ./config:/app/config:ro
+    depends_on: [postgres, opensearch, redis, neo4j, minio, grobid, openie6-adapter, llm]
+    ports: ["8081:8080"]
+
+  worker-cpu:
+    build: ./services/worker
+    command: ["python", "worker.py", "cpu"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+    volumes:
+      - ./services/api:/app
+      - ./config:/app/config:ro
+    depends_on: [api, redis]
+
+  worker-gpu:
+    build: ./services/worker
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    command: ["python", "worker.py", "gpu"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./services/api:/app
+      - ./config:/app/config:ro
+    depends_on: [api, llm, redis]
+
+  redis:
+    image: redis:7-alpine
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: ai_insights
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    ports: ["9200:9200", "9600:9600"]
+    volumes:
+      - osdata:/usr/share/opensearch/data
+
+  neo4j:
+    image: neo4j:5.23.0-community
+    environment:
+      - NEO4J_AUTH=neo4j/neo4j_pass
+    ports: ["7474:7474", "7687:7687"]
+    volumes:
+      - neo4jdata:/data
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio_pass
+    ports: ["9000:9000", "9001:9001"]
+    volumes:
+      - miniodata:/data
+
+  grobid:
+    image: lfoppiano/grobid:0.7.3
+    environment:
+      - GROBID_WORKERS=4
+    ports: ["8070:8070"]
+
+  # OpenIE6 runner (models + workspace shared via volumes)
+  openie6:
+    image: alanpross/openie6:latest
+    # The image exposes notebooks on 8888/8889; we rely on volumes, not HTTP here.
+    ports: ["8888:8888", "8889:8889"]
+    volumes:
+      - openie6_models:/models
+      - openie6_workspace:/workspace
+
+  # Stable REST adapter exposing /extract and /health around OpenIE6
+  openie6-adapter:
+    build: ./services/openie6-adapter
+    environment:
+      - OPENIE6_MODELS_DIR=/models
+      - OPENIE6_WORK_DIR=/workspace
+    volumes:
+      - openie6_models:/models
+      - openie6_workspace:/workspace
+    ports: ["9006:9006"]
+    depends_on: [openie6]
+
+  llm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    command: ["--model", "HuggingFaceH4/zephyr-7b-beta", "--gpu-memory-utilization", "0.85"]
+    environment:
+      - HF_HOME=/models
+    volumes:
+      - hfmodels:/models
+    ports: ["8000:8000"]
+
+  streamlit:
+    build: ./services/streamlit
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+    ports: ["8501:8501"]
+    depends_on: [api]
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  pgdata: {}
+  osdata: {}
+  neo4jdata: {}
+  miniodata: {}
+  hfmodels: {}
+  openie6_models: {}
+  openie6_workspace: {}

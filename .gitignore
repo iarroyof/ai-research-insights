@@ -1,0 +1,27 @@
+*.pyc
+.env
+.secrets
+/models/
+workspace/
+.data/
+dist/
+build/
+.cache/
+# Common ignores
+__pycache__/
+*.py[cod]
+env/
+venv/
+.DS_Store
+node_modules/
+
+# Large model / data files
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.tfrecord
+data/
+dataset/
+*.zip
+*.tar.gz

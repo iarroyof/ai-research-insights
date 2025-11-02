@@ -1,0 +1,11 @@
+services:
+  # Caddy ↔ host:18080 (and optional 18443 if you add TLS later)
+  caddy:
+    ports:
+      - "18080:8080"
+
+  # Optional: direct FastAPI bypass for debugging
+  api:
+    ports:
+      - "18081:8080"
+

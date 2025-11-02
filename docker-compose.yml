@@ -1,0 +1,202 @@
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+    volumes:
+      - ./services/api:/app
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - opensearch
+      - redis
+      - neo4j
+      - minio
+      - grobid
+      - llm
+      - models-init
+      - rebel-extractor
+      - corenlp-adapter
+
+  worker-cpu:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    command: ["python", "services/worker/worker.py", "cpu"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+    volumes:
+      - ./services/api:/app
+      - ./services/worker:/app/services/worker
+      - ./config:/app/config:ro
+    depends_on: [api, redis]
+
+  worker-gpu:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    runtime: nvidia
+    command: ["python", "services/worker/worker.py", "gpu"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./services/api:/app
+      - ./services/worker:/app/services/worker
+      - ./config:/app/config:ro
+    depends_on: [api, llm, redis]
+
+  # Infra (internal-only, no host ports exposed here)
+  redis:
+    image: redis:7-alpine
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=ai_insights
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-Admin123!ChangeMe}
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile:  { soft: 65536, hard: 65536 }
+    volumes:
+      - osdata:/usr/share/opensearch/data
+
+  neo4j:
+    image: neo4j:5.23.0-community
+    environment:
+      - NEO4J_AUTH=neo4j/neo4j_pass
+    volumes:
+      - neo4jdata:/data
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=minio_pass
+    volumes:
+      - miniodata:/data
+
+  grobid:
+    image: lfoppiano/grobid:0.7.3
+    environment:
+      - GROBID_WORKERS=4
+
+  llm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    command: ["--model", "HuggingFaceH4/zephyr-7b-beta", "--gpu-memory-utilization", "0.85"]
+    environment:
+      - HF_HOME=/models
+    volumes:
+      - /mnt/data/huggingface/hub:/models
+
+  models-init:
+    build:
+      context: .
+      dockerfile: services/models-init/Dockerfile
+    environment:
+      - HF_HOME=/models
+      - LLM_MODEL_ID=${LLM_MODEL_ID:-HuggingFaceH4/zephyr-7b-beta}
+    volumes:
+      - /mnt/data/huggingface/hub:/models
+
+  # --- REBEL extractor (main) ---
+  rebel-extractor:
+    build:
+      context: .
+      dockerfile: services/rebel-extractor/Dockerfile
+    runtime: nvidia
+    environment:
+      HF_HOME: /models
+      # Model/device
+      REBEL_MODEL_ID: Babelscape/rebel-large
+      REBEL_DEVICE: auto          # "cuda" if GPU is available, otherwise "cpu"
+      REBEL_FP16: "0"             # keep numerically stable on CPU
+
+      # Decoding (get more candidates)
+      REBEL_USE_BEAM: "1"
+      REBEL_NUM_BEAMS: "6"
+      REBEL_MAX_NEW_TOKENS: "128"
+      REBEL_TEMPERATURE: "1.0"    # keep deterministic; increase slightly if needed
+      REBEL_TOP_P: "1.0"
+
+      # Filtering / limits
+      REBEL_MIN_SCORE: "0.1"      # lower to avoid over-pruning
+      REBEL_MAX_TRIPLES: "10"
+
+      # Batching / timeouts
+      REBEL_BATCH_SIZE: "8"
+      REBEL_HTTP_TIMEOUT: "300"
+    volumes:
+      - /mnt/data/huggingface/hub:/models
+
+  # --- Stanford CoreNLP + adapter (fallback) ---
+  corenlp:
+    image: nlpbox/corenlp:latest   # official image referenced by Stanford docs
+    command:
+      - sh
+      - -lc
+      - >
+        java -Xms4g -Xmx8g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer
+        -port 9000 -timeout 600000 -threads 4
+        -quiet true
+        -preload tokenize,ssplit,pos,lemma,depparse,natlog,openie
+        -annotators tokenize,ssplit,pos,lemma,depparse,natlog,openie
+    # default entrypoint starts the CoreNLP server on port 9000
+    environment:
+      - TIMEOUT_MILLISECONDS=150000   # optional: tweak server timeout
+
+  corenlp-adapter:
+    build:
+      context: .
+      dockerfile: services/corenlp-adapter/Dockerfile
+    environment:
+      - CORENLP_URL=http://corenlp:9000   # <- use 9000 (image default)
+    depends_on: [corenlp]
+
+  # --- Streamlit UI ---
+  streamlit:
+    build:
+      context: .
+      dockerfile: services/streamlit/Dockerfile
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+    volumes:
+      - ./services/streamlit:/app
+      - ./config:/app/config:ro
+    depends_on: [api]
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  pgdata: {}
+  osdata: {}
+  neo4jdata: {}
+  miniodata: {}

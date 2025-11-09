@@ -10,7 +10,7 @@ from opensearchpy.helpers import bulk
 
 from app.config import settings
 from app.graph.neo_client import neo_session
-from app.search.os_client import os_client, _index_prefix
+from app.search.os_client import os_client
 
 
 def _csv_thresholds():
@@ -112,7 +112,7 @@ def triplets_csv_ingest(tenant: str, job_id: str, content: bytes) -> dict:
             # OpenSearch doc
             os_docs.append(
                 {
-                    "_index": f"{_index_prefix()}{tenant}_triplets",
+                    "_index": f"t_{tenant}_triplets",
                     "_op_type": "index",
                     "_id": triple_id,
                     "triple_id": triple_id,

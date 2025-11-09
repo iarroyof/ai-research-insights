@@ -21,7 +21,7 @@ postgres:
 
 opensearch:
   endpoint: http://opensearch:9200  # was url
-  index_prefix: t_
+  index_prefix: ""
   use_vectors: true
   vector_dim: 384
   bm25_k: 50

@@ -59,6 +59,43 @@ class SearchResponse(BaseModel):
     # Streamlit expects key "items"; we keep that alias
     hits: List[SearchHit] = Field(default_factory=list, serialization_alias="items")
 
+# ---------- Add Triplet-based fallback backend if none available ----------
+
+if _search_new is None and _search_legacy is None:
+    try:
+        from app.routers.triplets import triplets_search
+
+        async def _call_triplets(tenant: str, query: str, filters: Dict[str, Any], k: int):
+            # Delegate to triplet index search
+            results = await triplets_search(
+                tenant=tenant,
+                q=query,
+                confidence_min=filters.get("confidence_min", 0.0),
+                entity_type=filters.get("entity_type"),
+                pmid=filters.get("pmid"),
+            )
+            # Normalize to legacy format
+            hits = []
+            for t in results:
+                hits.append({
+                    "_source": {
+                        "paper_id": t.get("article_id"),
+                        "title": t.get("sentence_text", "")[:120],
+                        "pmid": t.get("pmid"),
+                        "pmcid": None,
+                        "page": None,
+                        "sent_id": t.get("triple_id"),
+                        "score": t.get("confidence", 0),
+                        "text": t.get("sentence_text", ""),
+                    },
+                    "_score": t.get("confidence", 0),
+                })
+            return hits
+
+        _search_new = _call_triplets
+        print("[INFO] Using triplet-based fallback search backend")
+    except Exception as e:
+        print(f"[WARN] Could not enable triplet fallback backend: {e}")
 
 # ----------------------------- Route ------------------------------
 
@@ -116,6 +153,8 @@ async def search(req: Request, body: SearchRequest) -> SearchResponse:
     except HTTPException:
         raise
     except Exception as e:
-        # Avoid leaking internals
-        raise HTTPException(status_code=500, detail="Search failed") from e
+        import traceback, sys
+        print("[ERROR] Unified search traceback:", file=sys.stderr)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Search failed: {type(e).__name__}: {e}")
 

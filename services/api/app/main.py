@@ -15,6 +15,7 @@ from .routers import chat as chat_router
 from .routers import triplets as triplets_router
 from .routers import papers as papers_router
 from .routers import annotations as annotations_router
+from .routers import ingest
 
 log = logging.getLogger("uvicorn")
 
@@ -45,3 +46,4 @@ app.include_router(chat_router.router)
 app.include_router(triplets_router.router)
 app.include_router(papers_router.router)
 app.include_router(annotations_router.router)
+app.include_router(ingest.router)

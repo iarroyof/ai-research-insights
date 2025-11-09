@@ -10,6 +10,9 @@ services:
       - caddy_config:/config
     depends_on: [api]
 
+    networks:
+      - ai_research_insights_net
+
   api:
     build:
       context: .
@@ -17,6 +20,7 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
     environment:
       - APP_CONFIG=/app/config/default.yaml
+      - API_URL=http://api:8080
     volumes:
       - ./services/api:/app
       - ./config:/app/config:ro
@@ -31,6 +35,10 @@ services:
       - models-init
       - rebel-extractor
       - corenlp-adapter
+    ports:
+      - "18081:8080"
+    networks:
+      - ai_research_insights_net
 
   worker-cpu:
     build:
@@ -44,6 +52,9 @@ services:
       - ./services/worker:/app/services/worker
       - ./config:/app/config:ro
     depends_on: [api, redis]
+
+    networks:
+      - ai_research_insights_net
 
   worker-gpu:
     build:
@@ -60,9 +71,15 @@ services:
       - ./config:/app/config:ro
     depends_on: [api, llm, redis]
 
+    networks:
+      - ai_research_insights_net
+
   # Infra (internal-only, no host ports exposed here)
   redis:
     image: redis:7-alpine
+
+    networks:
+      - ai_research_insights_net
 
   postgres:
     image: postgres:16
@@ -72,6 +89,8 @@ services:
       - POSTGRES_DB=ai_insights
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - ai_research_insights_net
 
   opensearch:
     image: opensearchproject/opensearch:2.13.0
@@ -79,13 +98,16 @@ services:
       - discovery.type=single-node
       - plugins.security.disabled=true
       - DISABLE_INSTALL_DEMO_CONFIG=true
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-Admin123!ChangeMe}
       - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
     ulimits:
       memlock: { soft: -1, hard: -1 }
       nofile:  { soft: 65536, hard: 65536 }
     volumes:
       - osdata:/usr/share/opensearch/data
+    networks:
+      - ai_research_insights_net
+    ports:
+      - "19200:9200"
 
   neo4j:
     image: neo4j:5.23.0-community
@@ -93,6 +115,8 @@ services:
       - NEO4J_AUTH=neo4j/neo4j_pass
     volumes:
       - neo4jdata:/data
+    networks:
+      - ai_research_insights_net
 
   minio:
     image: minio/minio
@@ -102,11 +126,15 @@ services:
       - MINIO_ROOT_PASSWORD=minio_pass
     volumes:
       - miniodata:/data
+    networks:
+      - ai_research_insights_net
 
   grobid:
     image: lfoppiano/grobid:0.7.3
     environment:
       - GROBID_WORKERS=4
+    networks:
+      - ai_research_insights_net
 
   llm:
     image: vllm/vllm-openai:latest
@@ -116,6 +144,8 @@ services:
       - HF_HOME=/models
     volumes:
       - /mnt/data/huggingface/hub:/models
+    networks:
+      - ai_research_insights_net
 
   models-init:
     build:
@@ -126,6 +156,8 @@ services:
       - LLM_MODEL_ID=${LLM_MODEL_ID:-HuggingFaceH4/zephyr-7b-beta}
     volumes:
       - /mnt/data/huggingface/hub:/models
+    networks:
+      - ai_research_insights_net
 
   # --- REBEL extractor (main) ---
   rebel-extractor:
@@ -156,6 +188,8 @@ services:
       REBEL_HTTP_TIMEOUT: "300"
     volumes:
       - /mnt/data/huggingface/hub:/models
+    networks:
+      - ai_research_insights_net
 
   # --- Stanford CoreNLP + adapter (fallback) ---
   corenlp:
@@ -172,6 +206,8 @@ services:
     # default entrypoint starts the CoreNLP server on port 9000
     environment:
       - TIMEOUT_MILLISECONDS=150000   # optional: tweak server timeout
+    networks:
+      - ai_research_insights_net
 
   corenlp-adapter:
     build:
@@ -180,6 +216,9 @@ services:
     environment:
       - CORENLP_URL=http://corenlp:9000   # <- use 9000 (image default)
     depends_on: [corenlp]
+
+    networks:
+      - ai_research_insights_net
 
   # --- Streamlit UI ---
   streamlit:
@@ -192,6 +231,10 @@ services:
       - ./services/streamlit:/app
       - ./config:/app/config:ro
     depends_on: [api]
+    ports:
+      - "8501:8501"
+    networks:
+      - ai_research_insights_net
 
 volumes:
   caddy_data: {}
@@ -200,3 +243,8 @@ volumes:
   osdata: {}
   neo4jdata: {}
   miniodata: {}
+
+networks:
+  ai_research_insights_net:
+    name: ai_research_insights_net
+    driver: bridge

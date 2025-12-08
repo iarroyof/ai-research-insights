@@ -1,24 +1,29 @@
 # services/api/app/middleware/tenant.py
 from __future__ import annotations
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Allow health without tenant header
-        if request.url.path == "/health":
+        path = request.url.path
+
+        # 🔓 Public graph viewer:
+        # Allow tenant from header, query param, or fallback to "default"
+        if path.startswith("/triplets/graph/view"):
+            tenant_id = (
+                request.headers.get("X-Tenant-Id")
+                or request.query_params.get("tenant")
+                or "default"
+            )
+            request.state.tenant_id = tenant_id
             return await call_next(request)
 
-        tenant_id = request.headers.get("x-tenant-id")  # case-insensitive
-        if not tenant_id or not tenant_id.strip():
-            return JSONResponse(
-                status_code=400,
-                content={"detail": "Missing X-Tenant-Id"},
-            )
+        # 🔐 Normal behavior for all other endpoints
+        tenant_id = request.headers.get("X-Tenant-Id")
+        if not tenant_id:
+            raise HTTPException(status_code=400, detail="Missing X-Tenant-Id")
 
-        request.state.tenant_id = tenant_id.strip()
+        request.state.tenant_id = tenant_id
         return await call_next(request)
-

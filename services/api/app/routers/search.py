@@ -50,9 +50,14 @@ class SearchHit(BaseModel):
     pmid: Optional[str] = None
     pmcid: Optional[str] = None
     page: Optional[int] = None
-    sent_id: Optional[int] = None
+    sent_id: Optional[str] = None  # ✅ FIXED: Changed from int to str for hash IDs
     score: Optional[float] = None
     text: Optional[str] = None
+    # ✅ ADDED: Triplet-specific fields
+    subject: Optional[str] = None
+    relation: Optional[str] = None
+    object: Optional[str] = None
+    confidence: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
@@ -111,7 +116,7 @@ async def search(req: Request, body: SearchRequest) -> SearchResponse:
             # New backend supports filters & k directly and returns normalized hits
             raw_hits = await _search_new(tenant, body.query, body.filters, body.k)
         else:
-            # Legacy backend returns raw ES hits; we’ll normalize below
+            # Legacy backend returns raw ES hits; we'll normalize below
             raw_hits = await _search_legacy(tenant, body.query, body.target, body.k)  # type: ignore
 
         hits: List[SearchHit] = []
@@ -142,9 +147,14 @@ async def search(req: Request, body: SearchRequest) -> SearchResponse:
                     pmid=src.get("pmid"),
                     pmcid=src.get("pmcid"),
                     page=src.get("page"),
-                    sent_id=src.get("sent_id"),
+                    sent_id=src.get("sent_id"),  # Now accepts string
                     score=score,
                     text=text,
+                    # ✅ ADDED: Pass through triplet fields
+                    subject=src.get("subject"),
+                    relation=src.get("relation"),
+                    object=src.get("object"),
+                    confidence=src.get("confidence"),
                 )
             )
 
@@ -157,4 +167,3 @@ async def search(req: Request, body: SearchRequest) -> SearchResponse:
         print("[ERROR] Unified search traceback:", file=sys.stderr)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Search failed: {type(e).__name__}: {e}")
-

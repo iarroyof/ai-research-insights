@@ -189,8 +189,17 @@ async def ingest_ncbi(req: Request, body: NcbiRequest):
 
 class ConditionedSummaryItem(BaseModel):
     paper_id: str
-    sent_id: Optional[int] = None  # when provided, use exact sentence spans; otherwise, whole paper
-
+    sent_id: Optional[str] = None  # when provided, use exact sentence spans; otherwise, whole paper
+    # Additional fields from search results (optional) - allows passing context without re-lookup
+    text: Optional[str] = None
+    subject: Optional[str] = None
+    relation: Optional[str] = None
+    object: Optional[str] = None
+    title: Optional[str] = None
+    pmid: Optional[str] = None
+    pmcid: Optional[str] = None
+    page: Optional[int] = None
+    confidence: Optional[float] = None
 
 class ConditionedSummaryRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
@@ -206,7 +215,7 @@ class ConditionedSummaryRequest(BaseModel):
 
 class SupportSentence(BaseModel):
     paper_id: str
-    sent_id: Optional[int] = None
+    sent_id: Optional[str] = None
     text: str
     subject: Optional[str] = None
     predicate: Optional[str] = None

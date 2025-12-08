@@ -1,7 +1,7 @@
 # services/api/app/summarize/conditioned.py
-
 from __future__ import annotations
 from typing import List, Dict, Any
+
 from app.rag.context import fetch_pinned_snippets
 from app.triplets.util import triples_for_sentences
 
@@ -14,8 +14,9 @@ async def summarize_conditioned(tenant: str, message: str, items: List[dict], op
     """
     # Lazy import to avoid circular dependency during module initialization
     from app.clients.llm import stream_completion
-    
+
     pinned = await fetch_pinned_snippets(tenant, items)
+
     # (Very) simple prompt for now; you may want a stricter template
     context_block = "\n".join([f"- {s['text']}" for s in pinned])
     prompt = f"""You are summarizing research findings conditioned on the pinned context.
@@ -38,6 +39,7 @@ Write a concise, well-structured summary in 2-4 paragraphs. Reference the most r
 
     # Attach support (top-k sentences; use triplets_for_sentences for SVO)
     support_base = await triples_for_sentences(tenant, pinned, confidence_min=0.1)
+
     # Build fast maps (TODO: real retrieval/ranking per paragraph)
     para_objs = []
     for p in paras:
@@ -46,12 +48,20 @@ Write a concise, well-structured summary in 2-4 paragraphs. Reference the most r
         for s in pinned[:5]:
             svos = [t for t in support_base if t.get("sent_id") == s.get("sent_id")]
             support.append({
-                "sentence": s["text"],
-                "paper_id": s["paper_id"], "title": s.get("title"),
-                "pmid": s.get("pmid"), "pmcid": s.get("pmcid"),
-                "page": s.get("page"), "sent_id": s.get("sent_id"),
+                "text": s["text"],  # FIXED: was "sentence", should be "text"
+                "paper_id": s["paper_id"], 
+                "title": s.get("title"),
+                "pmid": s.get("pmid"), 
+                "pmcid": s.get("pmcid"),
+                "page": s.get("page"), 
+                "sent_id": s.get("sent_id"),
+                "subject": s.get("subject"),
+                "predicate": s.get("predicate") or s.get("relation"),  # FIXED: Check both fields
+                "object": s.get("object"),
                 "svos": [{"subject": t.get("subject"), "predicate": t.get("predicate"), "object": t.get("object"),
                           "confidence": t.get("confidence")} for t in svos]
             })
         para_objs.append({"text": p, "support": support})
+
     return para_objs
+

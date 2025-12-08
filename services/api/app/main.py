@@ -1,12 +1,10 @@
 # services/api/app/main.py
 from __future__ import annotations
-
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from .config import settings
-from .middleware.security import ApiKeyMiddleware
+from .middleware.security import SecurityMiddleware  # Fixed: was ApiKeyMiddleware
 from .middleware.tenant import TenantMiddleware
 
 # Routers
@@ -21,7 +19,7 @@ log = logging.getLogger("uvicorn")
 
 app = FastAPI(title="AI Research Insights API", version="0.1.0")
 
-# CORS - Fixed: settings.app is a Pydantic model, not a dict
+# CORS
 allow_origins = settings.app.allow_cors_origins
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +30,8 @@ app.add_middleware(
 )
 
 # Security & Tenant middlewares
-app.add_middleware(ApiKeyMiddleware)
+# Note: Order matters! Security checks first, then tenant resolution
+app.add_middleware(SecurityMiddleware)  # Fixed: was ApiKeyMiddleware
 app.add_middleware(TenantMiddleware)
 
 # Health endpoint

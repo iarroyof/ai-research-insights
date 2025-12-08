@@ -32,7 +32,7 @@ class BBox(BaseModel):
 
 class AnnotationCreate(BaseModel):
     paper_id: str = Field(min_length=1, max_length=128)
-    sent_id: Optional[int] = Field(default=None, ge=0)
+    sent_id: Optional[str] = Field(default=None, ge=0)
     kind: str = Field(pattern=r"^(highlight|note|like|unlike)$")
     payload: Dict[str, Any] = Field(default_factory=dict)
     page: Optional[int] = Field(default=None, ge=1)
@@ -54,7 +54,7 @@ class AnnotationCreate(BaseModel):
 class AnnotationOut(BaseModel):
     id: str
     paper_id: str
-    sent_id: Optional[int]
+    sent_id: Optional[str]
     kind: str
     payload: Dict[str, Any]
     page: Optional[int]
@@ -90,7 +90,7 @@ def _pg_dsn() -> str:
     if hasattr(settings, "pg_dsn"):
         dsn = settings.pg_dsn
     elif hasattr(settings, "db") and isinstance(settings.db, dict) and settings.db.get("dsn"):
-        dsn = settings.db["dsn"]
+        dsn = str(settings.postgres.dsn).replace("postgresql+psycopg://", "postgresql://")
     elif hasattr(settings, "db") and getattr(settings.db, "dsn", None):
         dsn = settings.db.dsn
     if not dsn:
@@ -232,7 +232,7 @@ async def create_annotations_batch(req: Request, body: BatchCreateRequest):
 async def list_annotations(
     req: Request,
     paper_id: Optional[str] = Query(default=None),
-    sent_id: Optional[int] = Query(default=None, ge=0),
+    sent_id: Optional[str] = Query(default=None, ge=0),
     kind: Optional[str] = Query(default=None, pattern=r"^(highlight|note|like|unlike)$"),
     limit: int = Query(default=100, ge=1, le=500),
     cursor: Optional[str] = Query(default=None, description="Opaque cursor for pagination"),

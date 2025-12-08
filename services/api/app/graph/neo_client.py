@@ -8,8 +8,8 @@ def neo_driver():
     global _driver
     if _driver is None:
         _driver = GraphDatabase.driver(
-            settings.neo.uri,
-            auth=(settings.neo.user, settings.neo.password)
+            settings.neo4j.uri,
+            auth=(settings.neo4j.user, settings.neo4j.password)
         )
     return _driver
 

@@ -3,7 +3,6 @@ import asyncio
 from typing import AsyncGenerator
 import httpx
 
-
 class LLMClient:
     def __init__(self):
         # Lazy import: only load settings when the client is instantiated
@@ -31,7 +30,6 @@ class LLMClient:
                     if line.startswith("data: "):
                         yield line[6:]
 
-
 # ----------------------------------------------------------------------
 # Deterministic alias for summarize/conditioned.py
 # ----------------------------------------------------------------------
@@ -39,7 +37,27 @@ async def stream_completion(prompt: str, **kwargs) -> AsyncGenerator[str, None]:
     """
     Deterministic backward-compatible stream completion for summarize/conditioned.py.
     It simply wraps LLMClient.chat_stream() with the user prompt.
+    
+    Parses OpenAI-format streaming chunks and yields only the text content.
     """
+    import json
+    
     client = LLMClient()
     async for chunk in client.chat_stream([{"role": "user", "content": prompt}]):
-        yield chunk
+        # Skip [DONE] signal
+        if chunk == "[DONE]":
+            break
+        
+        try:
+            # Parse the JSON chunk
+            data = json.loads(chunk)
+            
+            # Extract text content from OpenAI format
+            if "choices" in data and len(data["choices"]) > 0:
+                delta = data["choices"][0].get("delta", {})
+                content = delta.get("content", "")
+                if content:
+                    yield content
+        except json.JSONDecodeError:
+            # Skip malformed chunks
+            continue

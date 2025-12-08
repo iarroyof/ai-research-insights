@@ -9,7 +9,6 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [api]
-
     networks:
       - ai_research_insights_net
 
@@ -52,7 +51,6 @@ services:
       - ./services/worker:/app/services/worker
       - ./config:/app/config:ro
     depends_on: [api, redis]
-
     networks:
       - ai_research_insights_net
 
@@ -70,14 +68,12 @@ services:
       - ./services/worker:/app/services/worker
       - ./config:/app/config:ro
     depends_on: [api, llm, redis]
-
     networks:
       - ai_research_insights_net
 
-  # Infra (internal-only, no host ports exposed here)
+  # Infra
   redis:
     image: redis:7-alpine
-
     networks:
       - ai_research_insights_net
 
@@ -113,8 +109,15 @@ services:
     image: neo4j:5.23.0-community
     environment:
       - NEO4J_AUTH=neo4j/neo4j_pass
+      # Optional: increase memory for better performance
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=2G
+      - NEO4J_server_memory_pagecache_size=1G
     volumes:
       - neo4jdata:/data
+    ports:
+      - "7474:7474"  # HTTP (Browser UI)
+      - "7687:7687"  # Bolt protocol (API access)
     networks:
       - ai_research_insights_net
 
@@ -167,23 +170,16 @@ services:
     runtime: nvidia
     environment:
       HF_HOME: /models
-      # Model/device
       REBEL_MODEL_ID: Babelscape/rebel-large
-      REBEL_DEVICE: auto          # "cuda" if GPU is available, otherwise "cpu"
-      REBEL_FP16: "0"             # keep numerically stable on CPU
-
-      # Decoding (get more candidates)
+      REBEL_DEVICE: auto
+      REBEL_FP16: "0"
       REBEL_USE_BEAM: "1"
       REBEL_NUM_BEAMS: "6"
       REBEL_MAX_NEW_TOKENS: "128"
-      REBEL_TEMPERATURE: "1.0"    # keep deterministic; increase slightly if needed
+      REBEL_TEMPERATURE: "1.0"
       REBEL_TOP_P: "1.0"
-
-      # Filtering / limits
-      REBEL_MIN_SCORE: "0.1"      # lower to avoid over-pruning
+      REBEL_MIN_SCORE: "0.1"
       REBEL_MAX_TRIPLES: "10"
-
-      # Batching / timeouts
       REBEL_BATCH_SIZE: "8"
       REBEL_HTTP_TIMEOUT: "300"
     volumes:
@@ -193,7 +189,7 @@ services:
 
   # --- Stanford CoreNLP + adapter (fallback) ---
   corenlp:
-    image: nlpbox/corenlp:latest   # official image referenced by Stanford docs
+    image: nlpbox/corenlp:latest
     command:
       - sh
       - -lc
@@ -203,9 +199,8 @@ services:
         -quiet true
         -preload tokenize,ssplit,pos,lemma,depparse,natlog,openie
         -annotators tokenize,ssplit,pos,lemma,depparse,natlog,openie
-    # default entrypoint starts the CoreNLP server on port 9000
     environment:
-      - TIMEOUT_MILLISECONDS=150000   # optional: tweak server timeout
+      - TIMEOUT_MILLISECONDS=150000
     networks:
       - ai_research_insights_net
 
@@ -214,9 +209,8 @@ services:
       context: .
       dockerfile: services/corenlp-adapter/Dockerfile
     environment:
-      - CORENLP_URL=http://corenlp:9000   # <- use 9000 (image default)
+      - CORENLP_URL=http://corenlp:9000
     depends_on: [corenlp]
-
     networks:
       - ai_research_insights_net
 
@@ -227,12 +221,14 @@ services:
       dockerfile: services/streamlit/Dockerfile
     environment:
       - APP_CONFIG=/app/config/default.yaml
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
     volumes:
       - ./services/streamlit:/app
       - ./config:/app/config:ro
     depends_on: [api]
-    ports:
-      - "8501:8501"
+    # Remove port exposure since Caddy will proxy
+    # ports:
+    #   - "8501:8501"
     networks:
       - ai_research_insights_net
 

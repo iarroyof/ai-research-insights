@@ -4,12 +4,46 @@
 
 :8080 {
     log
-
-    reverse_proxy api:8080 {
-        # Keep FastAPI happy (HTTP/1.1 upstream)
-        transport http {
-            versions 1.1
+    
+    # API routes (specific paths first)
+    handle /search* {
+        reverse_proxy api:8080 {
+            transport http {
+                versions 1.1
+            }
+        }
+    }
+    
+    handle /chat* {
+        reverse_proxy api:8080 {
+            transport http {
+                versions 1.1
+            }
+        }
+    }
+    
+    handle /papers* {
+        reverse_proxy api:8080 {
+            transport http {
+                versions 1.1
+            }
+        }
+    }
+    
+    handle /triplets* {
+        reverse_proxy api:8080 {
+            transport http {
+                versions 1.1
+            }
+        }
+    }
+    
+    # Catch-all: Streamlit UI on all other paths (including root)
+    handle {
+        reverse_proxy streamlit:8501 {
+            transport http {
+                versions 1.1
+            }
         }
     }
 }
-

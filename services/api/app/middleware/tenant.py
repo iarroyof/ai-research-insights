@@ -1,16 +1,18 @@
 # services/api/app/middleware/tenant.py
 from __future__ import annotations
-
 from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
-
 
 class TenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
+        # 🔓 Skip tenant check for health endpoint
+        if path == "/health":
+            request.state.tenant_id = "default"
+            return await call_next(request)
+
         # 🔓 Public graph viewer:
-        # Allow tenant from header, query param, or fallback to "default"
         if path.startswith("/triplets/graph/view"):
             tenant_id = (
                 request.headers.get("X-Tenant-Id")
@@ -27,3 +29,4 @@ class TenantMiddleware(BaseHTTPMiddleware):
 
         request.state.tenant_id = tenant_id
         return await call_next(request)
+

@@ -20,6 +20,19 @@ services:
     environment:
       - APP_CONFIG=/app/config/default.yaml
       - API_URL=http://api:8080
+      - API_KEY=${API_KEY}
+
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - NEO4J_USER=${NEO4J_USER}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+
+      - LLM_MODEL_ID=${LLM_MODEL_ID}
+
     volumes:
       - ./services/api:/app
       - ./config:/app/config:ro
@@ -222,6 +235,7 @@ services:
     environment:
       - APP_CONFIG=/app/config/default.yaml
       - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - API_KEY=${API_KEY}
     volumes:
       - ./services/streamlit:/app
       - ./config:/app/config:ro

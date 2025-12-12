@@ -159,14 +159,23 @@ async def build_graph_from_selection(
     req: Request,
     items: List[Dict[str, Any]],
     confidence_min: float = Query(default=None, description="Min confidence for triples"),
+    ebio_min: float = Query(default=0.3, description="Min EBio probability for biomedical relevance"),
+    top_k: int = Query(default=50, description="Max number of triplets to return"),
 ):
     """
-    Build graph from selected items (sentences or papers).
-    Returns list of triple IDs that can be used with /graph/view.
+    Build graph from selected items using semantic search and quality filtering.
+
+    This endpoint:
+    1. Extracts key terms from selected sentences
+    2. Performs semantic search for relevant triplets
+    3. Applies quality filters (stopwords, deduplication, biomedical priority)
+    4. Returns top-k most relevant triplets
     """
+    from app.triplets.filters import search_triplets_semantic, extract_key_terms
+
     tenant = req.state.tenant_id
     if confidence_min is None:
-        confidence_min = float(getattr(settings, "confidence_min", 0.60))
+        confidence_min = float(getattr(settings.csv.thresholds, "confidence_min", 0.60))
 
     # Resolve sentences if needed
     if items and isinstance(items[0], dict) and items[0].get("text"):
@@ -177,8 +186,8 @@ async def build_graph_from_selection(
     # Derive paper_ids from sentences
     paper_ids = sorted({
         s.get("paper_id") or (
-            f"{s['pmcid']}.txt" 
-            if s.get("pmcid") and not str(s.get("paper_id", "")).endswith(".txt") 
+            f"{s['pmcid']}.txt"
+            if s.get("pmcid") and not str(s.get("paper_id", "")).endswith(".txt")
             else None
         )
         for s in sents
@@ -186,23 +195,35 @@ async def build_graph_from_selection(
     })
     paper_ids = [pid for pid in paper_ids if pid]
 
-    # Fetch triplets from OpenSearch
-    paper_triples = await triples_for_papers(tenant, paper_ids, confidence_min=confidence_min)
-    triple_ids = [t["triple_id"] for t in paper_triples]
+    # Extract key terms from selected sentences for semantic search
+    query = extract_key_terms(sents)
+
+    # Semantic search with quality filtering
+    filtered_triplets = await search_triplets_semantic(
+        tenant=tenant,
+        query=query,
+        paper_ids=paper_ids,
+        confidence_min=confidence_min,
+        ebio_min=ebio_min,
+        top_k=top_k,
+    )
+    
+    triple_ids = [t.get("_id") for t in filtered_triplets if t.get("_id")]
 
     return {
         "triple_ids": triple_ids,
         "count": len(triple_ids),
         "debug": {
-            "mode": "triplets_default_existing_only",
+            "mode": "semantic_search_filtered",
             "items_in": len(items),
             "paper_ids": paper_ids,
-            "paper_triples": len(paper_triples),
+            "query_terms": query[:200] + "..." if len(query) > 200 else query,
             "triples_found": len(triple_ids),
             "confidence_min": confidence_min,
+            "ebio_min": ebio_min,
+            "top_k": top_k,
         },
     }
-
 
 # ---------- JSON graph API ----------
 

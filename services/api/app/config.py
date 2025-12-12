@@ -126,8 +126,13 @@ class Settings(BaseSettings):
     @classmethod
     def load(cls, path: str | None = None) -> "Settings":
         cfg_path = path or os.environ.get("APP_CONFIG", "/app/config/default.yaml")
+        # 1) Read raw YAML
         with open(cfg_path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+            raw = f.read()
+        # 2) Expand ${VAR} using container environment
+        raw = os.path.expandvars(raw)
+        # 3) Parse YAML and construct settings
+        data = yaml.safe_load(raw)
         return cls(**data)
 
 # Single import point used by the whole app:

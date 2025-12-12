@@ -1,0 +1,237 @@
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    networks:
+      - ai_research_insights_net
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+      - API_URL=http://api:8080
+      - API_KEY=${API_KEY}
+    volumes:
+      - ./services/api:/app
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - opensearch
+      - redis
+      - neo4j
+      - minio
+      - grobid
+      - llm
+      - models-init
+      - rebel-extractor
+      - corenlp-adapter
+    # REMOVED: external port exposure - only accessible via Caddy
+    networks:
+      - ai_research_insights_net
+
+  worker-cpu:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    command: ["python", "services/worker/worker.py", "cpu"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+    volumes:
+      - ./services/api:/app
+      - ./services/worker:/app/services/worker
+      - ./config:/app/config:ro
+    depends_on: [api, redis]
+    networks:
+      - ai_research_insights_net
+
+  worker-gpu:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    runtime: nvidia
+    command: ["python", "services/worker/worker.py", "gpu"]
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./services/api:/app
+      - ./services/worker:/app/services/worker
+      - ./config:/app/config:ro
+    depends_on: [api, llm, redis]
+    networks:
+      - ai_research_insights_net
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - ai_research_insights_net
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # REMOVED: external port exposure
+    networks:
+      - ai_research_insights_net
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
+      - plugins.security.disabled=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    volumes:
+      - osdata:/usr/share/opensearch/data
+    # REMOVED: external port exposure (was 19200)
+    networks:
+      - ai_research_insights_net
+
+  neo4j:
+    image: neo4j:5.23.0-community
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER}/${NEO4J_PASSWORD}
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=2G
+      - NEO4J_server_memory_pagecache_size=1G
+    volumes:
+      - neo4jdata:/data
+    # REMOVED: external port exposure (was 7474, 7687)
+    networks:
+      - ai_research_insights_net
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    networks:
+      - ai_research_insights_net
+
+  grobid:
+    image: lfoppiano/grobid:0.7.3
+    environment:
+      - GROBID_WORKERS=4
+    networks:
+      - ai_research_insights_net
+
+  llm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    command: ["--model", "${LLM_MODEL_ID}", "--gpu-memory-utilization", "0.85"]
+    environment:
+      - HF_HOME=/models
+    volumes:
+      - /mnt/data/huggingface/hub:/models
+    networks:
+      - ai_research_insights_net
+
+  models-init:
+    build:
+      context: .
+      dockerfile: services/models-init/Dockerfile
+    environment:
+      - HF_HOME=/models
+      - LLM_MODEL_ID=${LLM_MODEL_ID}
+    volumes:
+      - /mnt/data/huggingface/hub:/models
+    networks:
+      - ai_research_insights_net
+
+  rebel-extractor:
+    build:
+      context: .
+      dockerfile: services/rebel-extractor/Dockerfile
+    runtime: nvidia
+    environment:
+      HF_HOME: /models
+      REBEL_MODEL_ID: Babelscape/rebel-large
+      REBEL_DEVICE: auto
+      REBEL_FP16: "0"
+      REBEL_USE_BEAM: "1"
+      REBEL_NUM_BEAMS: "6"
+      REBEL_MAX_NEW_TOKENS: "128"
+      REBEL_TEMPERATURE: "1.0"
+      REBEL_TOP_P: "1.0"
+      REBEL_MIN_SCORE: "0.1"
+      REBEL_MAX_TRIPLES: "10"
+      REBEL_BATCH_SIZE: "8"
+      REBEL_HTTP_TIMEOUT: "300"
+    volumes:
+      - /mnt/data/huggingface/hub:/models
+    networks:
+      - ai_research_insights_net
+
+  corenlp:
+    image: nlpbox/corenlp:latest
+    command:
+      - sh
+      - -lc
+      - >
+        java -Xms4g -Xmx8g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer
+        -port 9000 -timeout 600000 -threads 4
+        -quiet true
+        -preload tokenize,ssplit,pos,lemma,depparse,natlog,openie
+        -annotators tokenize,ssplit,pos,lemma,depparse,natlog,openie
+    environment:
+      - TIMEOUT_MILLISECONDS=150000
+    networks:
+      - ai_research_insights_net
+
+  corenlp-adapter:
+    build:
+      context: .
+      dockerfile: services/corenlp-adapter/Dockerfile
+    environment:
+      - CORENLP_URL=http://corenlp:9000
+    depends_on: [corenlp]
+    networks:
+      - ai_research_insights_net
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: services/streamlit/Dockerfile
+    environment:
+      - APP_CONFIG=/app/config/default.yaml
+      - PUBLIC_API_URL=${PUBLIC_API_URL}
+      - API_KEY=${API_KEY}
+    volumes:
+      - ./services/streamlit:/app
+      - ./config:/app/config:ro
+    depends_on: [api]
+    networks:
+      - ai_research_insights_net
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  pgdata: {}
+  osdata: {}
+  neo4jdata: {}
+  miniodata: {}
+
+networks:
+  ai_research_insights_net:
+    name: ai_research_insights_net
+    driver: bridge

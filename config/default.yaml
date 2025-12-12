@@ -1,58 +1,57 @@
 app:
   name: ai-research-insights
-  env: dev
+  env: prod
   log_level: INFO
   sse_heartbeat_seconds: 10
   allow_cors_origins: []
 
 security:
-  require_api_key: true          # new (we enforce API keys)
-  api_key: dev                   # dev default; rotate in prod
-  enable_hmac: false             # was require_hmac
-  rate_limit_per_min: 120        # was rate_limit_per_minute
+  require_api_key: true
+  api_key: ${API_KEY}
+  enable_hmac: false
+  rate_limit_per_min: 120
 
 multi_tenancy:
-  strategy: rls                  # rls|per_schema
+  strategy: rls
   default_tenant: default
   enforce: true
 
 postgres:
-  dsn: postgresql+psycopg://postgres:postgres@postgres:5432/ai_insights
+  dsn: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 
 opensearch:
-  endpoint: http://opensearch:9200  # was url
+  endpoint: http://opensearch:9200
   index_prefix: ""
   use_vectors: true
   vector_dim: 384
   bm25_k: 50
-  vec_k: 50                          # your old opensearch.k
-  fusion_weight: 0.5                 # lived under retrieval
+  vec_k: 50
+  fusion_weight: 0.5
 
 neo4j:
   uri: bolt://neo4j:7687
-  user: neo4j
-  password: neo4j_pass
+  user: ${NEO4J_USER}
+  password: ${NEO4J_PASSWORD}
 
 minio:
   endpoint: http://minio:9000
-  access_key: minio
-  secret_key: minio_pass
+  access_key: ${MINIO_ROOT_USER}
+  secret_key: ${MINIO_ROOT_PASSWORD}
   bucket: papers
 
 llm:
   base_url: http://llm:8000/v1
-  model: HuggingFaceH4/zephyr-7b-beta
+  model: ${LLM_MODEL_ID}
   max_input_tokens: 6000
   max_output_tokens: 512
   temperature: 0.2
   top_p: 1.0
 
-# Relation extraction config (unifies rebel/openie/corenlp)
 re:
   primary: rebel
-  rebel_url: "http://rebel-extractor:9007"         # from extraction.providers.rebel.base_url
-  openie6_url: "http://openie6-adapter:9006"       # from openie6.adapter_url
-  corenlp_url: "http://corenlp-adapter:9009"       # from extraction.providers.stanford.base_url
+  rebel_url: "http://rebel-extractor:9007"
+  openie6_url: "http://openie6-adapter:9006"
+  corenlp_url: "http://corenlp-adapter:9009"
   min_confidence: 0.10
 
 grobid:
@@ -63,14 +62,13 @@ pdf:
   max_pages: 400
   max_size_mb: 50
 
-# CSV thresholds (moved from triplets.thresholds)
 csv:
   thresholds:
     subject_ebio_min: 0.70
-    subject_ngen_min: 0.70          # new explicit default
+    subject_ngen_min: 0.70
     object_ebio_min: 0.70
-    object_ngen_min: 0.70           # new explicit default
-    confidence_min: 0.60            # you had 0.60 under triplets.thresholds
+    object_ngen_min: 0.70
+    confidence_min: 0.60
 
 antivirus:
   enabled: false
@@ -82,7 +80,6 @@ streaming:
   enable_sse: true
   chunk_bytes: 2048
 
-# (Optional) kept from your old file; now explicitly supported in config.py below
 classification:
   model_id: facebook/bart-large-mnli
   labels: ["has biomedical entity", "has generic noun", "other"]
@@ -92,4 +89,3 @@ classification:
 export:
   triples_csv_bucket: papers
   triples_csv_object: triplets_export/triplets.csv
-

@@ -1,49 +1,43 @@
 {
-    auto_https off
+    # For testing with self-signed cert (remove in production with real domain)
+    # auto_https off
 }
 
+# HTTP redirect to HTTPS (production)
 :8080 {
+    # For now, keep HTTP for local testing
     log
-    
-    # API routes (specific paths first)
+
+    handle /health {
+        reverse_proxy api:8080
+    }
+
     handle /search* {
-        reverse_proxy api:8080 {
-            transport http {
-                versions 1.1
-            }
-        }
+        reverse_proxy api:8080
     }
-    
+
     handle /chat* {
-        reverse_proxy api:8080 {
-            transport http {
-                versions 1.1
-            }
-        }
+        reverse_proxy api:8080
     }
-    
+
     handle /papers* {
-        reverse_proxy api:8080 {
-            transport http {
-                versions 1.1
-            }
-        }
+        reverse_proxy api:8080
     }
-    
+
     handle /triplets* {
-        reverse_proxy api:8080 {
-            transport http {
-                versions 1.1
-            }
-        }
+        reverse_proxy api:8080
     }
-    
-    # Catch-all: Streamlit UI on all other paths (including root)
+
+    handle /ingest* {
+        reverse_proxy api:8080
+    }
+
+    handle /annotations* {
+        reverse_proxy api:8080
+    }
+
     handle {
-        reverse_proxy streamlit:8501 {
-            transport http {
-                versions 1.1
-            }
-        }
+        reverse_proxy streamlit:8501
     }
 }
+

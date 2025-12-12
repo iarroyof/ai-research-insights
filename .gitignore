@@ -25,3 +25,4 @@ data/
 dataset/
 *.zip
 *.tar.gz
+ingestion_monitor.log

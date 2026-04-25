@@ -8,7 +8,7 @@
 
 **Authors**
 
-Ignacio Arroyo Fernández (Universidad Tecnológica de la Mixteca, UTM, iaf@gs.utm.mx), Eduardo Varela Hernández (LaSalle Oaxaca), and Luis Felipe Morales (LaSalle Oaxaca).
+Ignacio Arroyo Fernández (Universidad Tecnológica de la Mixteca, UTM, iaf [at] gs [dot] utm [dot] mx), Eduardo Varela Hernández (LaSalle Oaxaca), and Luis Felipe Morales (LaSalle Oaxaca).
 
 Project context: academic research project funded by **Secihti Ciencia de Frontera, Grant CF-2023-I-2854**.
 

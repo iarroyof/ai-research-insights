@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Component and Data Source Map">
+<defs>
+<marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 z" fill="#284b63"/></marker>
+<style>text{font-family:Arial,Helvetica,sans-serif}.title{font-size:30px;font-weight:700;fill:#102a43}.box-title{font-size:18px;font-weight:700;fill:#102a43}.box-body{font-size:13px;fill:#243b53}.label{font-size:13px;font-weight:700;fill:#284b63}.box{fill:#f7fbff;stroke:#2f6f8f;stroke-width:2;rx:8}.accent{fill:#e7f5ec;stroke:#2f855a}.store{fill:#fff8e6;stroke:#b7791f}.gpu{fill:#f3edff;stroke:#6b46c1}</style>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="48" class="title">Component and Data Source Map</text>
+<rect x="50" y="95" width="210" height="100" class="box"/>
+<text x="66" y="123" class="box-title">Search Results Component</text>
+<text x="66" y="149" class="box-body">Consumes /search/</text>
+<text x="66" y="167" class="box-body">Sorts confidence desc</text>
+<rect x="310" y="95" width="210" height="100" class="box"/>
+<text x="326" y="123" class="box-title">Pinned Context State</text>
+<text x="326" y="149" class="box-body">st.session_state</text>
+<text x="326" y="167" class="box-body">selected_papers</text>
+<rect x="570" y="70" width="210" height="100" class="box"/>
+<text x="586" y="98" class="box-title">Chat Component</text>
+<text x="586" y="124" class="box-body">Consumes /chat/</text>
+<text x="586" y="142" class="box-body">SSE events</text>
+<rect x="570" y="205" width="210" height="100" class="box"/>
+<text x="586" y="233" class="box-title">Summary Component</text>
+<text x="586" y="259" class="box-body">Consumes /papers/summarize_conditioned</text>
+<rect x="570" y="340" width="210" height="100" class="box"/>
+<text x="586" y="368" class="box-title">Graph Controls</text>
+<text x="586" y="394" class="box-body">Consumes /triplets/graph/build</text>
+<rect x="830" y="340" width="210" height="100" class="box"/>
+<text x="846" y="368" class="box-title">Graph Viewer Link</text>
+<text x="846" y="394" class="box-body">Opens /triplets/graph/view</text>
+<rect x="1070" y="70" width="160" height="80" class="box"/>
+<text x="1086" y="98" class="box-title">LLM/RAG</text>
+<text x="1086" y="124" class="box-body">vLLM + context</text>
+<rect x="1070" y="205" width="160" height="80" class="box store"/>
+<text x="1086" y="233" class="box-title">OpenSearch</text>
+<text x="1086" y="259" class="box-body">Search + triplets</text>
+<rect x="1070" y="340" width="160" height="80" class="box store"/>
+<text x="1086" y="368" class="box-title">Neo4j/Graph JSON</text>
+<text x="1086" y="394" class="box-body">Subgraph data</text>
+<line x1="260" y1="145" x2="310" y2="145" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="520" y1="128" x2="570" y2="120" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="520" y1="156" x2="570" y2="255" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="520" y1="184" x2="570" y2="390" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="780" y1="390" x2="830" y2="390" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="780" y1="120" x2="1070" y2="110" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="780" y1="255" x2="1070" y2="245" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<line x1="1040" y1="390" x2="1070" y2="380" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+</svg>

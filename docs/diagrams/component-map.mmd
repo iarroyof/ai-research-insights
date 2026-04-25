@@ -1,0 +1,10 @@
+flowchart LR
+  SearchPanel[Search panel] -->|POST /search/| Results[Results table]
+  Results --> State[st.session_state selected_papers]
+  State --> Chat[Chat tab]
+  State --> Summary[Summary tab]
+  State --> Graph[Triplets graph tab]
+  Chat -->|POST /chat/ SSE| APIChat[Chat router]
+  Summary -->|POST /papers/summarize_conditioned| APISummary[Papers router]
+  Graph -->|POST /triplets/graph/build| APIGraph[Triplets router]
+  APIGraph --> Viewer[GET /triplets/graph/view]

@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Search-to-graph sequence from query to interactive visualization">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 z" fill="#284b63"/>
+    </marker>
+    <style>
+      text{font-family:Arial,Helvetica,sans-serif}
+      .title{font-size:30px;font-weight:700;fill:#102a43}
+      .node-title{font-size:19px;font-weight:700;fill:#102a43}
+      .node-body{font-size:13px;fill:#243b53}
+      .label{font-size:15px;font-weight:700;fill:#284b63}
+      .label-bg{fill:#ffffff;stroke:#ffffff;stroke-width:8;stroke-linejoin:round;opacity:.92}
+      .box{fill:#f7fbff;stroke:#2f6f8f;stroke-width:2.2;rx:10}
+      .ui{fill:#e7f5ec;stroke:#2f855a}
+      .service{fill:#fff8e6;stroke:#b7791f}
+      .flow{fill:none;stroke:#284b63;stroke-width:2.7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+  <text x="40" y="52" class="title">Search-to-Graph Sequence</text>
+
+  <rect x="95" y="160" width="155" height="62" class="box"/>
+  <text x="119" y="198" class="node-title">Researcher</text>
+
+  <rect x="350" y="160" width="160" height="62" class="box ui"/>
+  <text x="386" y="198" class="node-title">Streamlit</text>
+
+  <rect x="620" y="160" width="160" height="62" class="box ui"/>
+  <text x="664" y="198" class="node-title">FastAPI</text>
+
+  <rect x="620" y="48" width="160" height="62" class="box service"/>
+  <text x="644" y="86" class="node-title">OpenSearch</text>
+
+  <rect x="860" y="405" width="185" height="62" class="box service"/>
+  <text x="881" y="443" class="node-title">Triplet Filters</text>
+
+  <rect x="205" y="505" width="175" height="62" class="box service"/>
+  <text x="232" y="543" class="node-title">Graph Viewer</text>
+
+  <path d="M250 191 L350 191" class="flow"/>
+  <text x="279" y="177" class="label-bg">query</text>
+  <text x="279" y="177" class="label">query</text>
+
+  <path d="M510 191 L620 191" class="flow"/>
+  <text x="531" y="174" class="label-bg">POST /search/</text>
+  <text x="531" y="174" class="label">POST /search/</text>
+
+  <path d="M700 160 L700 110" class="flow"/>
+  <text x="716" y="137" class="label-bg">hybrid search</text>
+  <text x="716" y="137" class="label">hybrid search</text>
+
+  <path d="M670 110 C655 128 655 143 670 160" class="flow"/>
+  <text x="632" y="134" class="label-bg">hits</text>
+  <text x="632" y="134" class="label">hits</text>
+
+  <path d="M195 222 C245 260 305 260 365 222" class="flow"/>
+  <text x="237" y="262" class="label-bg">select rows</text>
+  <text x="237" y="262" class="label">select rows</text>
+
+  <path d="M505 218 C620 288 705 363 860 430" class="flow"/>
+  <text x="650" y="286" class="label-bg">POST /graph/build</text>
+  <text x="650" y="286" class="label">POST /graph/build</text>
+
+  <path d="M882 466 C705 570 560 455 488 222" class="flow"/>
+  <text x="585" y="453" class="label-bg">triple IDs</text>
+  <text x="585" y="453" class="label">triple IDs</text>
+
+  <path d="M375 220 C300 330 315 425 335 505" class="flow"/>
+  <text x="225" y="368" class="label-bg">GET /graph/view</text>
+  <text x="225" y="368" class="label">GET /graph/view</text>
+</svg>

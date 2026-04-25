@@ -1,0 +1,12 @@
+flowchart LR
+  U[Researchers] --> UI[Streamlit GUI]
+  UI --> API[FastAPI REST API]
+  API --> OS[OpenSearch]
+  API --> PG[Postgres annotations]
+  API --> NEO[Neo4j graph]
+  API --> MINIO[MinIO papers]
+  API --> W[CPU/GPU workers]
+  W --> GROBID[GROBID]
+  W --> LLM[vLLM Zephyr]
+  W --> REBEL[REBEL extractor]
+  W --> CORENLP[CoreNLP fallback]

@@ -1,0 +1,15 @@
+flowchart LR
+  B[Browser] --> C[Caddy 8080/8443]
+  C -->|API paths| API[api:8080]
+  C -->|default route| S[streamlit:8501]
+  S --> API
+  API --> PG[postgres:5432]
+  API --> R[redis]
+  API --> OS[opensearch:9200]
+  API --> N[neo4j:7687]
+  API --> M[minio:9000]
+  API --> G[grobid:8070]
+  API --> V[vLLM GPU]
+  API --> X[REBEL/CoreNLP]
+  R --> WC[worker-cpu]
+  R --> WG[worker-gpu]

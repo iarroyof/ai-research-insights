@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant User
+  participant GUI as Streamlit GUI
+  participant API as FastAPI API
+  participant Search as OpenSearch
+  participant LLM as vLLM/RAG
+  participant Graph as Graph Services
+  User->>GUI: login, choose tenant, enter query
+  GUI->>API: POST /search/
+  API->>Search: hybrid search
+  Search-->>API: ranked hits
+  API-->>GUI: items
+  User->>GUI: select rows
+  GUI->>API: POST /chat/ or /papers/summarize_conditioned
+  API->>LLM: prompt with pinned context
+  LLM-->>API: answer/citations
+  API-->>GUI: SSE or JSON response
+  GUI->>API: POST /triplets/graph/build
+  API->>Graph: semantic triplet filtering
+  API-->>GUI: triple_ids
+  GUI->>API: GET /triplets/graph/view

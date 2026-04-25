@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Physical Deployment">
+<defs>
+<marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 z" fill="#284b63"/></marker>
+<style>text{font-family:Arial,Helvetica,sans-serif}.title{font-size:30px;font-weight:700;fill:#102a43}.box-title{font-size:18px;font-weight:700;fill:#102a43}.box-body{font-size:13px;fill:#243b53}.label{font-size:13px;font-weight:700;fill:#284b63}.box{fill:#f7fbff;stroke:#2f6f8f;stroke-width:2;rx:8}.accent{fill:#e7f5ec;stroke:#2f855a}.store{fill:#fff8e6;stroke:#b7791f}.gpu{fill:#f3edff;stroke:#6b46c1}</style>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="48" class="title">Physical Deployment</text>
+<rect x="40" y="100" width="180" height="92" class="box"/>
+<text x="56" y="128" class="box-title">Client Browser</text>
+<text x="56" y="154" class="box-body">App UI</text>
+<text x="56" y="172" class="box-body">Graph viewer</text>
+<rect x="290" y="92" width="180" height="108" class="box accent"/>
+<text x="306" y="120" class="box-title">Caddy :8080/:8443</text>
+<text x="306" y="146" class="box-body">Routes API paths</text>
+<text x="306" y="164" class="box-body">Default to Streamlit</text>
+<rect x="540" y="80" width="210" height="118" class="box accent"/>
+<text x="556" y="108" class="box-title">streamlit:8501</text>
+<text x="556" y="134" class="box-body">GUI container</text>
+<text x="556" y="152" class="box-body">PUBLIC_API_URL</text>
+<rect x="540" y="230" width="210" height="118" class="box accent"/>
+<text x="556" y="258" class="box-title">api:8080</text>
+<text x="556" y="284" class="box-body">uvicorn app.main:app</text>
+<text x="556" y="302" class="box-body">Mounted routers</text>
+<rect x="830" y="80" width="160" height="82" class="box store"/>
+<text x="846" y="108" class="box-title">postgres:5432</text>
+<text x="846" y="134" class="box-body">pgdata</text>
+<rect x="1030" y="80" width="160" height="82" class="box store"/>
+<text x="1046" y="108" class="box-title">redis:6379</text>
+<text x="1046" y="134" class="box-body">queue/broker</text>
+<rect x="830" y="190" width="160" height="82" class="box store"/>
+<text x="846" y="218" class="box-title">opensearch:9200</text>
+<text x="846" y="244" class="box-body">osdata</text>
+<rect x="1030" y="190" width="160" height="82" class="box store"/>
+<text x="1046" y="218" class="box-title">neo4j:7687</text>
+<text x="1046" y="244" class="box-body">neo4jdata</text>
+<rect x="830" y="300" width="160" height="82" class="box store"/>
+<text x="846" y="328" class="box-title">minio:9000</text>
+<text x="846" y="354" class="box-body">miniodata</text>
+<rect x="1030" y="300" width="160" height="82" class="box"/>
+<text x="1046" y="328" class="box-title">grobid:8070</text>
+<text x="1046" y="354" class="box-body">PDF metadata</text>
+<rect x="830" y="410" width="160" height="82" class="box"/>
+<text x="846" y="438" class="box-title">worker-cpu</text>
+<text x="846" y="464" class="box-body">ingest jobs</text>
+<rect x="1030" y="410" width="160" height="82" class="box gpu"/>
+<text x="1046" y="438" class="box-title">worker-gpu</text>
+<text x="1046" y="464" class="box-body">CUDA jobs</text>
+<rect x="830" y="520" width="160" height="82" class="box gpu"/>
+<text x="846" y="548" class="box-title">vLLM GPU</text>
+<text x="846" y="574" class="box-body">Zephyr 7B</text>
+<rect x="1030" y="520" width="160" height="82" class="box gpu"/>
+<text x="1046" y="548" class="box-title">REBEL/CoreNLP</text>
+<text x="1046" y="574" class="box-body">Relation extraction</text>
+<line x1="220" y1="146" x2="290" y2="146" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="215" y="138" class="label">HTTP</text>
+<line x1="470" y1="128" x2="540" y2="128" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="465" y="120" class="label">GUI</text>
+<line x1="470" y1="170" x2="540" y2="270" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="465" y="212" class="label">API</text>
+<line x1="645" y1="230" x2="645" y2="198" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="605" y="206" class="label">calls</text>
+<line x1="750" y1="286" x2="830" y2="121" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="750" y="195" class="label">DB</text>
+<line x1="750" y1="286" x2="1030" y2="121" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="850" y="195" class="label">queue</text>
+<line x1="750" y1="286" x2="830" y2="231" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="750" y="250" class="label">index</text>
+<line x1="750" y1="286" x2="1030" y2="231" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="850" y="250" class="label">graph</text>
+<line x1="750" y1="286" x2="830" y2="341" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="750" y="305" class="label">files</text>
+<line x1="750" y1="286" x2="1030" y2="341" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="850" y="305" class="label">parse</text>
+<line x1="750" y1="318" x2="830" y2="451" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="750" y="376" class="label">tasks</text>
+<line x1="750" y1="332" x2="1030" y2="451" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="850" y="383" class="label">GPU</text>
+<line x1="750" y1="342" x2="830" y2="561" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="750" y="443" class="label">LLM</text>
+<line x1="750" y1="350" x2="1030" y2="561" stroke="#284b63" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="850" y="447" class="label">RE</text>
+</svg>

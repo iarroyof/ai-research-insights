@@ -99,8 +99,16 @@ class HttpChatAdapter:
                     event = json.loads(data)
                     if event.get("type") == "token":
                         chunks.append(str(event.get("data") or ""))
-                    elif event.get("type") in {"citations", "memory_debug"}:
+                    elif event.get("type") in {
+                        "citations",
+                        "memory_debug",
+                        "reward",
+                        "evidence_table",
+                        "conversation_frame",
+                    }:
                         event_meta[event.get("type")] = event.get("data") or {}
+                    elif event.get("type") == "consistency_warning":
+                        event_meta.setdefault("consistency_warning", []).append(event.get("data") or {})
                 except Exception:
                     pass
         return AssistantAnswer(

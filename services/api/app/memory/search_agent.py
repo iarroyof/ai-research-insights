@@ -630,6 +630,47 @@ def _feedback_text(item: dict[str, Any]) -> str:
     )
 
 
+DISEASE_TAG_TERMS = {
+    "cancer", "tumor", "tumour", "carcinoma", "infection", "inflammation", "hypoxia",
+    "diabetes", "obesity", "fibrosis", "asthma", "cardiovascular", "autoimmune",
+}
+MECHANISM_TAG_TERMS = {
+    "activation", "signaling", "pathway", "inhibition", "suppression", "expression",
+    "metabolism", "crosslinking", "remodeling", "stiffness", "barrier", "immune",
+    "angiogenesis", "invasion", "migration", "resistance", "hypoxia", "cytokine",
+}
+EVIDENCE_TYPE_TAG_TERMS = {
+    "review", "trial", "case", "cohort", "preclinical", "in vitro", "in vivo",
+    "abstract", "introduction", "discussion", "results", "figure",
+}
+
+
+def _tag_terms(text: str, terms: set[str]) -> list[str]:
+    lower = (text or "").lower()
+    return sorted(term for term in terms if term in lower)[:12]
+
+
+def _retrieval_tags(item: dict[str, Any]) -> dict[str, list[str]]:
+    text = " ".join(
+        str(item.get(field) or "")
+        for field in ("title", "text", "sentence_text", "abstract", "section")
+    )
+    disease_tags = [str(v) for v in item.get("disease_terms") or item.get("disease_tags") or []]
+    mechanism_tags = [str(v) for v in item.get("mechanism_tags") or []]
+    evidence_type_tags = [str(v) for v in item.get("evidence_type_tags") or []]
+    annotations = item.get("annotations") or []
+    if isinstance(annotations, list):
+        for annotation in annotations:
+            parts = str(annotation).split("|")
+            if len(parts) >= 3 and parts[2].lower() == "disease":
+                disease_tags.append(parts[1])
+    return {
+        "disease_tags": list(dict.fromkeys(disease_tags + _tag_terms(text, DISEASE_TAG_TERMS)))[:12],
+        "mechanism_tags": list(dict.fromkeys(mechanism_tags + _tag_terms(text, MECHANISM_TAG_TERMS)))[:12],
+        "evidence_type_tags": list(dict.fromkeys(evidence_type_tags + _tag_terms(text, EVIDENCE_TYPE_TAG_TERMS)))[:12],
+    }
+
+
 def _feedback_candidates(texts: list[str], limit: int) -> list[str]:
     ideas = extract_ideas(*texts, limit=limit)
     terms = important_terms(" ".join(texts), limit=limit * 2)
@@ -1028,6 +1069,11 @@ async def build_auto_context(
                 item["search_query_index"] = query_index
                 item["search_level_index"] = level_index
                 item["search_rank"] = rank
+                item["retrieval_rank"] = rank
+                item["retrieval_score"] = float(item.get("score", item.get("_score", 0.0)) or 0.0)
+                item["bm25_score"] = item["retrieval_score"]
+                item["source_sentence_id"] = item.get("sent_id") or item.get("sentence_id")
+                item.update(_retrieval_tags(item))
                 item["feedback_terms_used"] = feedback_terms[:8]
                 snippets.append(item)
                 level_added.append(item)
@@ -1056,6 +1102,29 @@ async def build_auto_context(
         )
 
     payload = plan.to_dict()
+    retrieval_records = [
+        {
+            "rank": idx + 1,
+            "level": item.get("search_level"),
+            "level_index": item.get("search_level_index"),
+            "level_rank": item.get("search_rank"),
+            "bm25_score": item.get("bm25_score"),
+            "retrieval_score": item.get("retrieval_score"),
+            "query": item.get("auto_query"),
+            "query_label": item.get("auto_query_label"),
+            "query_source": item.get("auto_query_source"),
+            "frame_id": item.get("auto_frame_id"),
+            "frame_label": item.get("auto_frame_label"),
+            "source_sentence_id": item.get("source_sentence_id"),
+            "paper_id": item.get("paper_id"),
+            "pmid": item.get("pmid"),
+            "pmcid": item.get("pmcid"),
+            "disease_tags": item.get("disease_tags", []),
+            "mechanism_tags": item.get("mechanism_tags", []),
+            "evidence_type_tags": item.get("evidence_type_tags", []),
+        }
+        for idx, item in enumerate(snippets)
+    ]
     payload.update(
         {
             "result_count": len(snippets),
@@ -1065,6 +1134,7 @@ async def build_auto_context(
             "levels": plan.levels,
             "level_reports": level_reports,
             "feedback_terms": feedback_terms[:12],
+            "retrieval_records": retrieval_records,
             "skipped_off_topic_count": skipped_off_topic,
             "evidence_assembly": _evidence_assembly(
                 message=message,

@@ -26,9 +26,19 @@ async def fake_build_auto_context(**kwargs):
             {
                 "paper_id": "paper-1",
                 "sent_id": "s1",
+                "source_sentence_id": "s1",
                 "text": "PD-L1 expression is associated with response.",
                 "source": "auto_context",
                 "auto_context": True,
+                "search_level": "sentence",
+                "retrieval_rank": 1,
+                "bm25_score": 2.5,
+                "retrieval_score": 2.5,
+                "auto_query": "PD-L1 response",
+                "auto_query_label": "original",
+                "disease_tags": ["disease:oncology"],
+                "mechanism_tags": ["mechanism:expression"],
+                "evidence_type_tags": ["evidence:sentence"],
             }
         ],
         "plan": {
@@ -40,6 +50,30 @@ async def fake_build_auto_context(**kwargs):
             "query_labels": ["original"],
             "used_llm": False,
             "note": "Auto-context search found one snippet.",
+            "retrieval_records": [
+                {
+                    "rank": 1,
+                    "level": "sentence",
+                    "bm25_score": 2.5,
+                    "retrieval_score": 2.5,
+                    "query": "PD-L1 response",
+                    "query_label": "original",
+                    "source_sentence_id": "s1",
+                    "paper_id": "paper-1",
+                    "disease_tags": ["disease:oncology"],
+                    "mechanism_tags": ["mechanism:expression"],
+                    "evidence_type_tags": ["evidence:sentence"],
+                }
+            ],
+            "evidence_assembly": {
+                "clarification_recommended": False,
+                "evidence_puzzle": {
+                    "relation_evidence_count": 1,
+                    "edge_support_status": "supported",
+                    "covered_nodes": ["PD-L1"],
+                    "missing_nodes": [],
+                },
+            },
         },
     }
 
@@ -143,9 +177,24 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertEqual(Capture.observed_search_plan["result_count"], 1)
         self.assertEqual(Capture.observed_context[0]["source"], "auto_context")
         self.assertEqual(citations["auto_context"]["result_count"], 1)
+        self.assertEqual(citations["auto_context"]["retrieval_records"][0]["bm25_score"], 2.5)
+        self.assertEqual(citations["auto_context"]["answer_mode"], "direct_answer")
+        self.assertEqual(citations["snippets"][0]["source_sentence_id"], "s1")
+        self.assertEqual(citations["snippets"][0]["bm25_score"], 2.5)
+        self.assertEqual(citations["generation_telemetry"]["answer_mode"], "direct_answer")
+        self.assertEqual(citations["auto_context"]["prompt_hash"], citations["generation_telemetry"]["prompt_hash"])
+        self.assertIn("prompt_context_hash", citations["generation_telemetry"])
+        self.assertEqual(Capture.observed_search_plan["answer_mode"], "direct_answer")
         self.assertIn("Do not add outside biomedical mechanisms", Capture.llm_messages[0]["content"])
         self.assertIn("plausible", Capture.llm_messages[0]["content"])
         self.assertIn("missing evidence", Capture.llm_messages[0]["content"])
+
+    def test_answer_mode_detector_selects_mode_contracts(self):
+        from app.routers.chat import _answer_mode
+
+        self.assertEqual(_answer_mode("Give me a one-paragraph version for a novice user.", {}, correction_only_turn=False), "novice_rewrite")
+        self.assertEqual(_answer_mode("Is this phrase accurate: HGF reduces MET?", {}, correction_only_turn=False), "phrase_evaluation")
+        self.assertEqual(_answer_mode("From now on, stay within the TME scope.", {}, correction_only_turn=True), "correction_acknowledgement")
 
     def test_chat_discloses_enabled_web_context_in_citations(self):
         with patch(

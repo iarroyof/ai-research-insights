@@ -336,6 +336,14 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan["evidence_assembly"]["information_need"], "question")
         self.assertGreaterEqual(len(plan["candidate_frames"]), 2)
         self.assertIn("frame_result_counts", plan["evidence_assembly"])
+        self.assertGreaterEqual(len(plan["retrieval_records"]), 1)
+        first_record = plan["retrieval_records"][0]
+        self.assertEqual(first_record["rank"], 1)
+        self.assertEqual(first_record["bm25_score"], 5.0)
+        self.assertEqual(first_record["source_sentence_id"], "title")
+        self.assertIn("mechanism_tags", first_record)
+        self.assertEqual(snippets[0]["bm25_score"], 5.0)
+        self.assertEqual(snippets[0]["retrieval_rank"], 1)
 
     async def test_build_auto_context_keeps_sentence_search_fn_compatibility(self):
         old_llm_refine = settings.memory.auto_context_llm_refine

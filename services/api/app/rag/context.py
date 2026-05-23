@@ -222,10 +222,21 @@ def _build_citations(snippets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             {
                 "paper_id": s.get("paper_id"),
                 "title": s.get("title"),
+                "text": s.get("text"),
                 "pmid": pmid,
                 "pmcid": pmcid,
                 "page": s.get("page"),
                 "sent_id": s.get("sent_id"),
+                "source_sentence_id": s.get("source_sentence_id") or s.get("sent_id"),
+                "search_level": s.get("search_level"),
+                "retrieval_rank": s.get("retrieval_rank") or s.get("search_rank"),
+                "bm25_score": s.get("bm25_score") if s.get("bm25_score") is not None else s.get("score"),
+                "retrieval_score": s.get("retrieval_score") if s.get("retrieval_score") is not None else s.get("score"),
+                "auto_query": s.get("auto_query"),
+                "auto_query_label": s.get("auto_query_label"),
+                "disease_tags": s.get("disease_tags", []),
+                "mechanism_tags": s.get("mechanism_tags", []),
+                "evidence_type_tags": s.get("evidence_type_tags", []),
                 "links": links,
             }
         )

@@ -1,4 +1,5 @@
 # services/api/app/routers/chat.py
+import hashlib
 import re
 import uuid
 import json
@@ -162,6 +163,75 @@ def _hold_generation_for_clarification(evidence_assembly: Dict[str, Any] | None)
         return False
     edge_status = ((assembly.get("evidence_puzzle") or {}).get("edge_support_status") or "").lower()
     return edge_status in {"missing", "partial"}
+
+
+ANSWER_MODE_CONTRACTS: Dict[str, str] = {
+    "direct_answer": "Answer directly from supplied evidence. Separate supported facts from unsupported bridges.",
+    "novice_rewrite": (
+        "Rewrite for a novice by compressing only supported puzzle edges. Preserve caveats. "
+        "Do not introduce new named mechanisms, new outcomes, or broad-to-specific mechanism conversions. "
+        "If edge support is missing, state that the available evidence supports only the broader direction."
+    ),
+    "expert_mechanism": "Explain mechanism edges only when the supplied evidence supports the edge direction and required intermediate nodes.",
+    "phrase_evaluation": "Judge the proposed wording first as supported, unsupported, contradicted, or too broad; do not answer a stale prior topic.",
+    "diagnostic_trace_answer": "Answer about trace/evaluator evidence using diagnostic fields, not biomedical inference.",
+    "correction_acknowledgement": "Acknowledge the user correction and update scope without adding new evidence claims.",
+    "clarification": "Summarize the current puzzle state and ask one focused textual clarification.",
+}
+
+
+def _contains_any_text(message: str, markers: tuple[str, ...]) -> bool:
+    lower = (message or "").lower()
+    return any(marker in lower for marker in markers)
+
+
+def _answer_mode(message: str, evidence_assembly: Dict[str, Any] | None, *, correction_only_turn: bool) -> str:
+    if correction_only_turn:
+        return "correction_acknowledgement"
+    if _hold_generation_for_clarification(evidence_assembly):
+        return "clarification"
+    if _contains_any_text(
+        message,
+        (
+            "can the chatbot phrase",
+            "can i phrase",
+            "could i phrase",
+            "phrase the answer",
+            "is this phrase",
+            "is the phrase",
+            "is this wording",
+            "is the wording",
+            "the statement",
+            "this statement",
+            "that statement",
+        ),
+    ):
+        return "phrase_evaluation"
+    if _contains_any_text(message, ("reward model", "evaluator", "trace evidence", "before changing code", "diagnostic", "debug")):
+        return "diagnostic_trace_answer"
+    if _contains_any_text(message, ("novice", "one paragraph", "one-paragraph", "rewrite", "summarize", "summary")):
+        return "novice_rewrite"
+    if _contains_any_text(message, ("mechanism", "mechanistic", "pathway", "explain how", "why does")):
+        return "expert_mechanism"
+    return "direct_answer"
+
+
+def _prompt_hash(*parts: str) -> str:
+    return hashlib.sha256("\n\n".join(parts).encode("utf-8")).hexdigest()[:24]
+
+
+def _answer_mode_prompt(answer_mode: str, evidence_assembly: Dict[str, Any] | None) -> str:
+    contract = ANSWER_MODE_CONTRACTS.get(answer_mode, ANSWER_MODE_CONTRACTS["direct_answer"])
+    puzzle = (evidence_assembly or {}).get("evidence_puzzle") or {}
+    return (
+        "Answer mode contract:\n"
+        f"- mode: {answer_mode}\n"
+        f"- contract: {contract}\n"
+        f"- puzzle_edge_support_status: {puzzle.get('edge_support_status', 'unknown')}\n"
+        f"- puzzle_relation_evidence_count: {puzzle.get('relation_evidence_count', 0)}\n"
+        f"- puzzle_covered_nodes: {puzzle.get('covered_nodes', [])[:8]}\n"
+        f"- puzzle_missing_nodes: {puzzle.get('missing_nodes', [])[:8]}\n"
+    )
 
 
 def _is_scope_or_memory_correction_only(message: str) -> bool:
@@ -391,6 +461,12 @@ async def chat(req: Request, body: ChatRequest):
     ).strip()
     if evidence_assembly_context:
         prompt = f"{evidence_assembly_context}\n\nGrounded task prompt:\n{prompt}"
+    active_evidence_assembly = (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
+    answer_mode = _answer_mode(body.message, active_evidence_assembly, correction_only_turn=correction_only_turn)
+    answer_mode_contract = ANSWER_MODE_CONTRACTS.get(answer_mode, ANSWER_MODE_CONTRACTS["direct_answer"])
+    answer_mode_context = _answer_mode_prompt(answer_mode, active_evidence_assembly)
+    if not correction_only_turn:
+        prompt = f"{answer_mode_context}\n\nGrounded task prompt:\n{prompt}"
 
     # Inference-time memory policy. This is not weight training; it selects a
     # working set, tracks rewards, and stores trajectories for later learning.
@@ -446,6 +522,18 @@ async def chat(req: Request, body: ChatRequest):
         )
         messages.extend(native_history)
         messages.append({"role": "user", "content": prompt})
+        prompt_context_hash = _prompt_hash(evidence_assembly_context)
+        prompt_snapshot_hash = _prompt_hash(messages[0]["content"], prompt, answer_mode)
+        generation_telemetry = {
+            "answer_mode": answer_mode,
+            "answer_mode_contract": answer_mode_contract,
+            "prompt_hash": prompt_snapshot_hash,
+            "prompt_context_hash": prompt_context_hash,
+            "puzzle_state": {
+                **(((active_evidence_assembly or {}).get("evidence_puzzle")) or {}),
+                "clarification_recommended": bool((active_evidence_assembly or {}).get("clarification_recommended")),
+            },
+        }
 
         if context_plan:
             context_plan.meta["native_history_message_count"] = len(native_history)
@@ -502,6 +590,7 @@ async def chat(req: Request, body: ChatRequest):
                 "auto_context_used_llm": bool(auto_context_plan.get("used_llm", False)),
                 "warnings": context_plan.warnings,
             }
+            citations_payload["generation_telemetry"] = generation_telemetry
             if context_plan.web_results:
                 citations_payload["web_context"] = context_plan.web_results
             if auto_context_plan:
@@ -514,11 +603,15 @@ async def chat(req: Request, body: ChatRequest):
                     "skipped_off_topic_count": auto_context_plan.get("skipped_off_topic_count", 0),
                     "levels": auto_context_plan.get("levels", []),
                     "level_reports": auto_context_plan.get("level_reports", []),
+                    "retrieval_records": auto_context_plan.get("retrieval_records", []),
                     "evidence_assembly": {
                         key: value
                         for key, value in (auto_context_plan.get("evidence_assembly") or {}).items()
                         if key != "prompt_context"
                     },
+                    "answer_mode": answer_mode,
+                    "prompt_hash": prompt_snapshot_hash,
+                    "prompt_context_hash": prompt_context_hash,
                     "query_labels": auto_context_plan.get("query_labels", []),
                     "used_llm": auto_context_plan.get("used_llm", False),
                 }
@@ -540,7 +633,7 @@ async def chat(req: Request, body: ChatRequest):
                     retrieved_triplets=context_plan.retrieved_triplets,
                     pinned_snippets=pinned_items,
                     source_sentences=(citations.get("snippets", []) if isinstance(citations, dict) else []),
-                    search_plan=auto_context_plan,
+                    search_plan={**(auto_context_plan or {}), "answer_mode": answer_mode, "prompt_hash": prompt_snapshot_hash, "prompt_context_hash": prompt_context_hash},
                     started_at=started_at,
                     token_budget=body.options.token_budget,
                 )

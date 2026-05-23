@@ -264,7 +264,23 @@ def evidence_table_debug_payload(table: dict[str, Any]) -> dict[str, Any]:
                 "claim": claim.get("claim"),
                 "status": claim.get("status"),
                 "best_evidence_id": claim.get("best_evidence_id"),
+                "best_entailment": claim.get("best_entailment", 0.0),
+                "max_contradiction": claim.get("max_contradiction", 0.0),
                 "needs_user_confirmation": claim.get("needs_user_confirmation", False),
+                "nli": [
+                    {
+                        "evidence_id": item.get("evidence_id"),
+                        "status": item.get("status"),
+                        "label": item.get("nli_label"),
+                        "scores": item.get("nli_scores", {}),
+                        "premise_sentence": (item.get("evidence") or {}).get("sentence_text"),
+                        "hypothesis_claim": claim.get("claim"),
+                        "source_sentence_id": (item.get("evidence") or {}).get("sent_id"),
+                        "paper_id": (item.get("evidence") or {}).get("paper_id"),
+                        "retrieval_score": (item.get("evidence") or {}).get("retrieval_score"),
+                    }
+                    for item in claim.get("evidence", [])[:5]
+                ],
             }
             for claim in table.get("claims", [])
         ],

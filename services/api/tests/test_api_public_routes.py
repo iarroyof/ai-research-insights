@@ -33,6 +33,19 @@ class ApiPublicRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"detail": "Missing X-Tenant-Id"})
 
+    def test_chat_models_returns_configured_catalog(self):
+        headers = {"X-Tenant-Id": "default"}
+        if settings.security.require_api_key:
+            headers["X-API-Key"] = settings.security.api_key
+
+        response = self.client.get("/chat/models", headers=headers)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["tenant"], "default")
+        self.assertTrue(body["models"])
+        self.assertTrue(any(item.get("model") for item in body["models"]))
+
 
 if __name__ == "__main__":
     unittest.main()

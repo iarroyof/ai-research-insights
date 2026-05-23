@@ -464,6 +464,9 @@ async def llm_refine_variants(
     action_value_hints: list[dict[str, Any]],
     search_frame: dict[str, Any],
     max_variants: int,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_api_format: str | None = None,
 ) -> tuple[list[SearchQueryVariant], str]:
     note_lines = [
         f"- {_compact_text(str(item.get('note') or item.get('summary') or ''), 180)}"
@@ -501,7 +504,9 @@ async def llm_refine_variants(
     ]
     text = await LLMClient().chat_once(
         messages,
-        provider=settings.llm.context_manager_provider,
+        provider=llm_provider or settings.llm.context_manager_provider,
+        model=llm_model,
+        api_format=llm_api_format,
         max_tokens=900,
     )
     data = _extract_json_object(text) or {}
@@ -529,6 +534,9 @@ async def plan_auto_context(
     action_value_hints: list[dict[str, Any]],
     max_variants: int,
     allow_llm_refine: bool,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_api_format: str | None = None,
 ) -> AutoContextPlan:
     state = search_state_key(message, selected_context_count=selected_context_count)
     strategy = _strategy_from_hints(action_value_hints, notes)
@@ -557,6 +565,9 @@ async def plan_auto_context(
                 action_value_hints=action_value_hints,
                 search_frame=search_frame,
                 max_variants=max_variants,
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                llm_api_format=llm_api_format,
             )
             if llm_variants:
                 merged_variants = [*llm_variants, *base]
@@ -993,6 +1004,9 @@ async def build_auto_context(
     confidence_min: float = 0.5,
     search_fn: SearchFn | None = None,
     multilevel_search_fn: LevelSearchFn | None = None,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_api_format: str | None = None,
 ) -> dict[str, Any]:
     max_variants = max(1, int(settings.memory.auto_context_query_variants))
     k_total = max(1, int(settings.memory.auto_context_k))
@@ -1006,6 +1020,9 @@ async def build_auto_context(
         action_value_hints=action_value_hints,
         max_variants=max_variants,
         allow_llm_refine=bool(settings.memory.auto_context_llm_refine),
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_api_format=llm_api_format,
     )
 
     seen: set[tuple[Any, Any, str]] = set()

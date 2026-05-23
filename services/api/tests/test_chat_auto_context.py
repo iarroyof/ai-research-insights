@@ -14,13 +14,16 @@ class Capture:
     pinned = []
     options = {}
     allow_web_search = None
+    auto_kwargs = {}
     observed_search_plan = {}
     observed_context = []
     llm_messages = []
+    llm_kwargs = {}
 
 
 async def fake_build_auto_context(**kwargs):
     Capture.auto_called = True
+    Capture.auto_kwargs = kwargs
     return {
         "snippets": [
             {
@@ -123,8 +126,9 @@ class FakeContextPolicy:
 
 
 class FakeLLMClient:
-    async def chat_stream(self, messages):
+    async def chat_stream(self, messages, **kwargs):
         Capture.llm_messages = messages
+        Capture.llm_kwargs = kwargs
         yield json.dumps({"choices": [{"delta": {"content": "grounded answer"}}]})
         yield "[DONE]"
 
@@ -139,9 +143,11 @@ class ChatAutoContextTests(unittest.TestCase):
         Capture.pinned = []
         Capture.options = {}
         Capture.allow_web_search = None
+        Capture.auto_kwargs = {}
         Capture.observed_search_plan = {}
         Capture.observed_context = []
         Capture.llm_messages = []
+        Capture.llm_kwargs = {}
 
     @staticmethod
     def _events(response):
@@ -164,7 +170,17 @@ class ChatAutoContextTests(unittest.TestCase):
                 json={
                     "message": "Does PD-L1 predict response?",
                     "items": [],
-                    "options": {"allow_memory": True, "allow_auto_context": True, "allow_extra_retrieval": True},
+                    "options": {
+                        "allow_memory": True,
+                        "allow_auto_context": True,
+                        "allow_extra_retrieval": True,
+                        "chat_provider": "nvidia",
+                        "chat_model": "nvidia/test-chat",
+                        "chat_api_format": "openai_chat",
+                        "context_provider": "nvidia",
+                        "context_model": "nvidia/test-context",
+                        "context_api_format": "openai_chat",
+                    },
                 },
             )
 
@@ -185,6 +201,10 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertEqual(citations["auto_context"]["prompt_hash"], citations["generation_telemetry"]["prompt_hash"])
         self.assertIn("prompt_context_hash", citations["generation_telemetry"])
         self.assertEqual(Capture.observed_search_plan["answer_mode"], "direct_answer")
+        self.assertEqual(Capture.auto_kwargs["llm_provider"], "nvidia")
+        self.assertEqual(Capture.auto_kwargs["llm_model"], "nvidia/test-context")
+        self.assertEqual(Capture.llm_kwargs["provider"], "nvidia")
+        self.assertEqual(Capture.llm_kwargs["model"], "nvidia/test-chat")
         self.assertIn("Do not add outside biomedical mechanisms", Capture.llm_messages[0]["content"])
         self.assertIn("plausible", Capture.llm_messages[0]["content"])
         self.assertIn("missing evidence", Capture.llm_messages[0]["content"])

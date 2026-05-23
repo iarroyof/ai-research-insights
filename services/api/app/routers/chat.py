@@ -66,6 +66,12 @@ class ChatOptions(BaseModel):
     token_budget: int = Field(default=2000)
     confidence_min: float = Field(default=0.5)
     expose_memory_debug: bool = Field(default=False)
+    chat_provider: Optional[str] = Field(default=None)
+    chat_model: Optional[str] = Field(default=None)
+    chat_api_format: Optional[str] = Field(default=None)
+    context_provider: Optional[str] = Field(default=None)
+    context_model: Optional[str] = Field(default=None)
+    context_api_format: Optional[str] = Field(default=None)
 
 
 class ChatRequest(BaseModel):
@@ -300,6 +306,20 @@ async def provider_metrics(req: Request):
     }
 
 
+@router.get("/models")
+async def chat_models(req: Request):
+    """
+    Return chat/context model choices for the UI.
+
+    Discovered provider models are marked available=true. Presets remain
+    selectable when the provider catalog is unreachable from the API process.
+    """
+    return {
+        "tenant": getattr(req.state, "tenant_id", "default"),
+        "models": await LLMClient().model_catalog(),
+    }
+
+
 @router.get("/memory/ideas")
 async def memory_ideas(req: Request, session_id: Optional[str] = None, limit: int = 20):
     """
@@ -421,6 +441,9 @@ async def chat(req: Request, body: ChatRequest):
                 store=MemoryStore(tenant),
                 selected_context_count=0,
                 confidence_min=body.options.confidence_min,
+                llm_provider=body.options.context_provider,
+                llm_model=body.options.context_model,
+                llm_api_format=body.options.context_api_format,
             )
             auto_context_snippets = auto_payload.get("snippets", []) or []
             auto_context_plan = auto_payload.get("plan", {}) or {}
@@ -558,7 +581,16 @@ async def chat(req: Request, body: ChatRequest):
             answer_parts.append(correction_ack)
             yield {"type": "token", "data": correction_ack}
         elif not hold_for_clarification:
-            async for chunk in llm.chat_stream(messages):
+            chat_kwargs = {
+                key: value
+                for key, value in {
+                    "provider": body.options.chat_provider,
+                    "model": body.options.chat_model,
+                    "api_format": body.options.chat_api_format,
+                }.items()
+                if value
+            }
+            async for chunk in llm.chat_stream(messages, **chat_kwargs):
                 # Parse OpenAI-format JSON chunk
                 if chunk == "[DONE]":
                     break

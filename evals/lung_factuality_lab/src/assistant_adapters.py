@@ -105,6 +105,7 @@ class HttpChatAdapter:
                         "reward",
                         "evidence_table",
                         "conversation_frame",
+                        "semantic_drift_trace",
                     }:
                         event_meta[event.get("type")] = event.get("data") or {}
                     elif event.get("type") == "consistency_warning":

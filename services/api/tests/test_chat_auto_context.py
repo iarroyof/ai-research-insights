@@ -210,11 +210,33 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertIn("missing evidence", Capture.llm_messages[0]["content"])
 
     def test_answer_mode_detector_selects_mode_contracts(self):
-        from app.routers.chat import _answer_mode
+        from app.routers.chat import _answer_mode, _post_generation_expansion_guard
 
         self.assertEqual(_answer_mode("Give me a one-paragraph version for a novice user.", {}, correction_only_turn=False), "novice_rewrite")
         self.assertEqual(_answer_mode("Is this phrase accurate: HGF reduces MET?", {}, correction_only_turn=False), "phrase_evaluation")
         self.assertEqual(_answer_mode("From now on, stay within the TME scope.", {}, correction_only_turn=True), "correction_acknowledgement")
+
+        repaired, trace = _post_generation_expansion_guard(
+            "This adds a named mediator and a specific downstream outcome not present in the evidence.",
+            answer_mode="novice_rewrite",
+            evidence_assembly={
+                "evidence_puzzle": {
+                    "covered_nodes": ["ECM stiffness", "tumor behavior"],
+                    "missing_nodes": ["specific mediator", "drug delivery"],
+                    "edge_support_status": "missing",
+                    "relation_evidence_count": 0,
+                }
+            },
+            source_snippets=[
+                {
+                    "text": "Matrix crosslinking enzymes and ECM remodeling contribute to increased tumor tissue stiffness."
+                }
+            ],
+        )
+        self.assertTrue(trace["applied"])
+        self.assertIn("retrieved source sentences", repaired)
+        self.assertIn("Matrix crosslinking enzymes", repaired)
+        self.assertIn("Do not add a detailed mechanism", repaired)
 
     def test_chat_discloses_enabled_web_context_in_citations(self):
         with patch(

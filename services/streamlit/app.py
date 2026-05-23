@@ -360,7 +360,7 @@ def render_chat():
                                 citations_data = data.get("data", {})
                             elif event_type in {"warning", "consistency_warning"}:
                                 warnings_data.append(data.get("data", {}))
-                            elif event_type in {"memory_debug", "reward", "evidence_table", "conversation_frame"}:
+                            elif event_type in {"memory_debug", "reward", "evidence_table", "conversation_frame", "semantic_drift_trace"}:
                                 debug_data[event_type] = data.get("data", {})
                             elif event_type == "final":
                                 session_id = data.get("data", {}).get("session_id")

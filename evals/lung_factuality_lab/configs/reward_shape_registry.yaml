@@ -395,6 +395,26 @@ shapes:
         failure_count: 10
         failed_turns: 6
         decision: partial_improvement_but_failed_guard
+      - path: evals/lung_factuality_lab/runs/shape7k_guard_caf_ecm_live_single
+        mode: live_single_sentinel_c_post_generation_expansion_guard
+        conversations: 1
+        turns: 7
+        avg_reward: 0.7365
+        failure_count: 9
+        failed_turns: 4
+        missed_injected_traps: 1
+        decision: failed_guard_stop_broader_sentinel
+        notes: Guard applied on novice rewrite turn but over-compressed into a meta-boundary answer; do not run broader Shape7 guard from this candidate.
+      - path: evals/lung_factuality_lab/runs/shape7k_guard_caf_ecm_live_single_refined
+        mode: live_single_sentinel_c_source_bound_expansion_guard
+        conversations: 1
+        turns: 7
+        avg_reward: 0.7481
+        failure_count: 8
+        failed_turns: 4
+        missed_injected_traps: 1
+        decision: failed_guard_stop_broader_sentinel_and_stage2
+        notes: Source-bound repair improved reward only slightly; remaining failures include reward/evaluator weighting on supported caveats and missed correction-memory trap.
     promotion_decision: keep_shape7j_candidate_only_failed_stromal_ecm_sentinel_guard
 
 blocked_shapes:

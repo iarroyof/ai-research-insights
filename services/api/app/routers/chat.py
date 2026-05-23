@@ -180,7 +180,10 @@ ANSWER_MODE_CONTRACTS: Dict[str, str] = {
     ),
     "expert_mechanism": "Explain mechanism edges only when the supplied evidence supports the edge direction and required intermediate nodes.",
     "phrase_evaluation": "Judge the proposed wording first as supported, unsupported, contradicted, or too broad; do not answer a stale prior topic.",
-    "diagnostic_trace_answer": "Answer about trace/evaluator evidence using diagnostic fields, not biomedical inference.",
+    "diagnostic_trace_answer": (
+        "Answer about trace/evaluator evidence using diagnostic fields, not biomedical inference. "
+        "If the user references a correction, preserve that correction and do not reverse a prior false-premise rejection."
+    ),
     "correction_acknowledgement": "Acknowledge the user correction and update scope without adding new evidence claims.",
     "clarification": "Summarize the current puzzle state and ask one focused textual clarification.",
 }
@@ -238,6 +241,98 @@ def _answer_mode_prompt(answer_mode: str, evidence_assembly: Dict[str, Any] | No
         f"- puzzle_covered_nodes: {puzzle.get('covered_nodes', [])[:8]}\n"
         f"- puzzle_missing_nodes: {puzzle.get('missing_nodes', [])[:8]}\n"
     )
+
+
+def _needs_post_generation_guard(answer_mode: str, evidence_assembly: Dict[str, Any] | None) -> bool:
+    puzzle = (evidence_assembly or {}).get("evidence_puzzle") or {}
+    edge_status = str(puzzle.get("edge_support_status") or "").lower()
+    relation_count = int(puzzle.get("relation_evidence_count") or 0)
+    return answer_mode in {"novice_rewrite", "clarification"} and (
+        edge_status in {"missing", "partial"} or relation_count <= 0
+    )
+
+
+def _post_generation_expansion_guard(
+    answer: str,
+    *,
+    answer_mode: str,
+    evidence_assembly: Dict[str, Any] | None,
+    source_snippets: List[Dict[str, Any]] | None = None,
+) -> tuple[str, dict[str, Any]]:
+    assembly = evidence_assembly or {}
+    puzzle = assembly.get("evidence_puzzle") or {}
+    if not _needs_post_generation_guard(answer_mode, assembly):
+        return answer, {"applied": False, "accepted_claims": [], "repaired_claims": [], "blocked_claims": []}
+
+    covered = _display_terms(_filter_display_nodes(puzzle.get("covered_nodes")), limit=6)
+    missing = _display_terms(_filter_display_nodes(puzzle.get("missing_nodes")), limit=6)
+    edge_status = str(puzzle.get("edge_support_status") or "uncertain")
+    relation_count = int(puzzle.get("relation_evidence_count") or 0)
+    blocked_claims = [
+        line.strip(" -*\t")
+        for line in re.split(r"[\n.;]", answer or "")
+        if line.strip() and len(line.strip()) > 24
+    ][:8]
+
+    source_points = _source_bound_points(source_snippets or [])
+    if source_points:
+        repair = (
+            "For a novice: keep the explanation at the level supported by the retrieved source sentences. "
+            f"The supported points are: {'; '.join(source_points)}. "
+        )
+    else:
+        subject = covered or "the retrieved concepts"
+        repair = (
+            f"For a novice: the available evidence supports only the broader direction involving {subject}. "
+            f"The current evidence puzzle has {edge_status} edge support"
+            f" and {relation_count} validated relation-evidence link{'s' if relation_count != 1 else ''}. "
+        )
+    if missing:
+        repair += f"Do not add a detailed mechanism across {missing} unless specific source sentences support those edges. "
+    repair += "Keep unverified causes, mediators, and outcomes explicitly caveated."
+
+    return repair, {
+        "applied": True,
+        "answer_mode": answer_mode,
+        "edge_support_status": edge_status,
+        "relation_evidence_count": relation_count,
+        "accepted_claims": [repair],
+        "repaired_claims": [
+            {
+                "reason": "answer exceeded supported puzzle boundary",
+                "repair": "replaced generated answer with evidence-boundary novice wording",
+            }
+        ],
+        "blocked_claims": blocked_claims,
+    }
+
+
+def _filter_display_nodes(nodes: Any) -> list[str]:
+    blocked = {
+        "give", "one", "one paragraph", "paragraph", "version", "novice", "user", "but",
+        "keep", "biomedical", "direction", "answer", "again", "after", "correction",
+    }
+    kept: list[str] = []
+    for node in nodes or []:
+        text = str(node).strip().lower()
+        if not text or text in blocked or len(text) < 3:
+            continue
+        kept.append(str(node).strip())
+    return kept[:10]
+
+
+def _source_bound_points(snippets: List[Dict[str, Any]]) -> list[str]:
+    points: list[str] = []
+    for idx, snippet in enumerate(snippets[:2], start=1):
+        text = str(snippet.get("text") or snippet.get("title") or "").strip()
+        if not text:
+            continue
+        text = re.sub(r"\[[^\]]+\]", "", text)
+        text = re.sub(r"\s+", " ", text).strip(" .")
+        if len(text) > 220:
+            text = text[:217].rsplit(" ", 1)[0] + "..."
+        points.append(f"[{idx}] {text}")
+    return points
 
 
 def _is_scope_or_memory_correction_only(message: str) -> bool:
@@ -575,6 +670,13 @@ async def chat(req: Request, body: ChatRequest):
         hold_for_clarification = _hold_generation_for_clarification(
             (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
         )
+        guard_generation = _needs_post_generation_guard(answer_mode, active_evidence_assembly)
+        post_generation_trace: Dict[str, Any] = {
+            "applied": False,
+            "accepted_claims": [],
+            "repaired_claims": [],
+            "blocked_claims": [],
+        }
         # Stream model tokens - parse OpenAI JSON chunks
         if correction_only_turn:
             correction_ack = _correction_acknowledgement(body.message)
@@ -604,10 +706,22 @@ async def chat(req: Request, body: ChatRequest):
                         content = delta.get("content", "")
                         if content:
                             answer_parts.append(content)
-                            yield {"type": "token", "data": content}
+                            if not guard_generation:
+                                yield {"type": "token", "data": content}
                 except json.JSONDecodeError:
                     # Skip malformed chunks
                     continue
+            if guard_generation:
+                repaired, post_generation_trace = _post_generation_expansion_guard(
+                    "".join(answer_parts),
+                    answer_mode=answer_mode,
+                    evidence_assembly=active_evidence_assembly,
+                    source_snippets=(citations.get("snippets", []) if isinstance(citations, dict) else []),
+                )
+                if post_generation_trace.get("applied"):
+                    answer_parts = [repaired]
+                    yield {"type": "semantic_drift_trace", "data": post_generation_trace}
+                    yield {"type": "token", "data": repaired}
         
         # Send citations after completion
         if context_plan:
@@ -622,6 +736,7 @@ async def chat(req: Request, body: ChatRequest):
                 "auto_context_used_llm": bool(auto_context_plan.get("used_llm", False)),
                 "warnings": context_plan.warnings,
             }
+            generation_telemetry["post_generation_guard"] = post_generation_trace
             citations_payload["generation_telemetry"] = generation_telemetry
             if context_plan.web_results:
                 citations_payload["web_context"] = context_plan.web_results

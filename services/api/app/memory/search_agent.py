@@ -52,6 +52,12 @@ TME_GROWTH_BRIDGE = [
     "stromal immune metabolic crosstalk cytokines lactate angiogenesis invasion proliferation",
 ]
 
+STROMAL_ECM_BRIDGE = [
+    "cancer associated fibroblast extracellular matrix remodeling stiffness lung cancer",
+    "CAF collagen crosslinking ECM stiffness drug delivery barrier immune infiltration tumor microenvironment",
+    "stromal fibroblast matrix stiffness invasion therapy resistance NSCLC",
+]
+
 MATH_PHARM_SYNERGY_TERMS = {
     "combination index", "ci value", "chou talalay", "dose response", "drug synergy",
     "therapeutic agent", "therapeutic agents", "combination therapy", "cytotoxicity",
@@ -72,6 +78,7 @@ def _domain_search_frame(message: str, notes: list[dict[str, Any]] | None = None
     cancer_context = _contains_any(text, {"tme", "tumor microenvironment", "lung", "carcinoma", "cancer", "nsclc"})
     synergy_context = "synergy" in text or "synerg" in text or "crosstalk" in text
     mechanistic_context = _contains_any(text, {"mechanistic", "mechanism", "pathway", "crosstalk", "interaction", "cooperative", "functional synergy", "pivot"})
+    stromal_ecm_context = _contains_any(text, {"caf", "fibroblast", "ecm", "extracellular matrix", "matrix stiffness", "collagen", "crosslinking"})
 
     preferred: list[str] = []
     avoid: list[str] = []
@@ -83,6 +90,9 @@ def _domain_search_frame(message: str, notes: list[dict[str, Any]] | None = None
     if cancer_context and (_contains_any(text, {"tme", "tumor microenvironment"}) or "growth" in text):
         frame = "tme_tumor_growth" if frame == "general_biomedical" else frame
         preferred.extend(TME_GROWTH_BRIDGE)
+    if stromal_ecm_context:
+        frame = "stromal_ecm" if frame == "general_biomedical" else frame
+        preferred.extend(STROMAL_ECM_BRIDGE)
     if mechanistic_context and not asks_drug_synergy:
         avoid.extend(sorted(MATH_PHARM_SYNERGY_TERMS))
 
@@ -295,17 +305,20 @@ def deterministic_query_variants(
     candidates: list[tuple[str, str, str, str]] = [
         ("original", message, "narrow" if strategy == "narrow" else strategy, "deterministic"),
     ]
-    for preferred in (search_frame or {}).get("preferred_queries", [])[:3]:
-        candidates.append(("domain_bridge", preferred, "wide" if strategy != "narrow" else "medium", "deterministic"))
     if terms:
         candidates.append(("important_terms", " ".join(terms[:10]), strategy, "deterministic"))
+    if synonym_terms:
+        candidates.append(("biomedical_synonyms", " ".join(list(dict.fromkeys(normalized + synonym_terms))[:12]), "wide", "deterministic"))
+    preferred_queries = list((search_frame or {}).get("preferred_queries", [])[:3])
+    if preferred_queries:
+        candidates.append(("domain_bridge", preferred_queries[0], "wide" if strategy != "narrow" else "medium", "deterministic"))
     if terms and (_intent_bucket(message) in {"mechanism", "compare", "evidence"} or _query_ambiguity(message, 0) != "low"):
         relation_words = ["mechanism", "evidence", "relationship"] if _intent_bucket(message) == "mechanism" else ["evidence", "relationship"]
         candidates.append(("relation_probe", " ".join(list(dict.fromkeys(terms[:10] + relation_words))), "wide", "deterministic"))
     if normalized:
         candidates.append(("normalized_ideas", " ".join(normalized[:8]), "medium", "deterministic"))
-    if synonym_terms:
-        candidates.append(("biomedical_synonyms", " ".join(list(dict.fromkeys(normalized + synonym_terms))[:12]), "wide", "deterministic"))
+    for preferred in preferred_queries[1:]:
+        candidates.append(("domain_bridge", preferred, "wide" if strategy != "narrow" else "medium", "deterministic"))
     if strategy == "wide" and terms and normalized:
         candidates.append(("mixed_wide", " ".join(list(dict.fromkeys(normalized + terms[:10] + synonym_terms[:6]))), "wide", "deterministic"))
 

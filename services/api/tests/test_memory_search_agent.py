@@ -157,6 +157,25 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("pdl1", joined)
         self.assertIn("nsclc", joined)
 
+    def test_user_critical_terms_precede_broad_domain_bridge_for_acronym_queries(self):
+        frame = _domain_search_frame(
+            "Explain CAF-associated ECM remodeling and matrix stiffness mechanistically."
+        )
+        variants = deterministic_query_variants(
+            "Explain CAF-associated ECM remodeling and matrix stiffness mechanistically.",
+            strategy="medium",
+            max_variants=4,
+            search_frame=frame,
+        )
+        labels = [item.label for item in variants]
+        joined = " ".join(item.query.lower() for item in variants)
+
+        self.assertIn("important_terms", labels)
+        self.assertIn("biomedical_synonyms", labels)
+        self.assertLess(labels.index("important_terms"), labels.index("domain_bridge"))
+        self.assertIn("cancer associated fibroblast", joined)
+        self.assertIn("extracellular matrix", joined)
+
     def test_domain_bridge_maps_functional_synergy_to_mechanistic_tme_terms(self):
         frame = _domain_search_frame("What is the functional synergy that defines aggressive lung carcinoma?")
         variants = deterministic_query_variants(

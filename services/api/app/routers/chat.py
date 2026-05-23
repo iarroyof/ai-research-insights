@@ -358,7 +358,16 @@ async def chat(req: Request, body: ChatRequest):
         """
         nonlocal citations
         messages = [
-            {"role": "system", "content": "You are a helpful research assistant. Answer based on the provided context."},
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful research assistant. Answer based on the provided context. "
+                    "Do not add outside biomedical mechanisms, examples, mediators, therapies, or pathway steps "
+                    "when the supplied context does not directly support them. If a relation is only plausible "
+                    "from general knowledge, label it as not supported by the supplied context instead of explaining it as true. "
+                    "Avoid 'known', 'plausible', 'implies', 'suggests', and 'likely' for a relation unless the cited context directly supports that relation."
+                ),
+            },
         ]
         native_history = _native_history_messages(
             context_plan,

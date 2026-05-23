@@ -16,6 +16,7 @@ class Capture:
     allow_web_search = None
     observed_search_plan = {}
     observed_context = []
+    llm_messages = []
 
 
 async def fake_build_auto_context(**kwargs):
@@ -89,6 +90,7 @@ class FakeContextPolicy:
 
 class FakeLLMClient:
     async def chat_stream(self, messages):
+        Capture.llm_messages = messages
         yield json.dumps({"choices": [{"delta": {"content": "grounded answer"}}]})
         yield "[DONE]"
 
@@ -105,6 +107,7 @@ class ChatAutoContextTests(unittest.TestCase):
         Capture.allow_web_search = None
         Capture.observed_search_plan = {}
         Capture.observed_context = []
+        Capture.llm_messages = []
 
     @staticmethod
     def _events(response):
@@ -140,6 +143,8 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertEqual(Capture.observed_search_plan["result_count"], 1)
         self.assertEqual(Capture.observed_context[0]["source"], "auto_context")
         self.assertEqual(citations["auto_context"]["result_count"], 1)
+        self.assertIn("Do not add outside biomedical mechanisms", Capture.llm_messages[0]["content"])
+        self.assertIn("plausible", Capture.llm_messages[0]["content"])
 
     def test_chat_discloses_enabled_web_context_in_citations(self):
         with patch(

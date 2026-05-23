@@ -844,6 +844,9 @@ def _evidence_assembly(
         "Do not fill a missing edge with a new example or mediator that is absent from the supplied snippets. "
         "Do not name absent example candidates merely to illustrate a missing edge. "
         "Do not name a candidate therapy, agent, framework, pathway, or experiment unless the supplied context supports that named candidate. "
+        "Do not use outside-field knowledge to expand an unsupported section; only say the bridge is not present in the supplied context. "
+        "Avoid phrases such as 'known', 'plausible', 'implies', 'suggests', or 'likely' for a relation unless a cited snippet directly supports that exact relation. "
+        "If a cited snippet supports only one part of a chain, keep the unsupported part separate and do not convert it into a mechanistic claim. "
         "If the user asks for only supported evidence, do not offer a hypothetical frame that invents candidate nodes. "
         "When the requested relation is underspecified or evidence edges are missing, state the supported partial structure and ask one focused clarification."
     )

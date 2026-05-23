@@ -450,6 +450,94 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ph", nodes)
         self.assertTrue(assembly["clarification_recommended"])
 
+    async def test_phrase_check_followup_reuses_prior_evidence_frame(self):
+        plan = await plan_auto_context(
+            message='Can the chatbot phrase the answer as: "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response."?',
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior query was about CAF-associated ECM remodeling and stiffness.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "llm_refined",
+                                "query": "CAF ECM remodeling stiffness lung cancer progression",
+                                "strategy": "medium",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        self.assertEqual(plan.variants[0].label, "prior_frame")
+        self.assertIn("ecm remodeling", plan.variants[0].query.lower())
+
+        assembly = _evidence_assembly(
+            message='Can the chatbot phrase the answer as: "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response."?',
+            plan=plan,
+            snippets=[],
+            level_reports=[],
+        )
+        self.assertFalse(assembly["clarification_recommended"])
+        self.assertIn("judge the proposed wording first", assembly["prompt_context"].lower())
+
+    async def test_rewrite_and_reward_followups_do_not_hold_for_clarification(self):
+        for message in (
+            "Give me a one-paragraph version for a novice user, but keep the biomedical direction correct.",
+            "Now answer again in two sentences after my correction. What should the reward model check?",
+        ):
+            plan = await plan_auto_context(
+                message=message,
+                selected_context_count=0,
+                notes=[
+                    {
+                        "note": "Prior supported frame.",
+                        "search_plan": {
+                            "variants": [
+                                {
+                                    "label": "llm_refined",
+                                    "query": "CAF ECM remodeling stiffness lung cancer progression",
+                                }
+                            ]
+                        },
+                    }
+                ],
+                action_value_hints=[],
+                max_variants=4,
+                allow_llm_refine=False,
+            )
+            assembly = _evidence_assembly(
+                message=message,
+                plan=plan,
+                snippets=[],
+                level_reports=[],
+            )
+
+            self.assertFalse(assembly["clarification_recommended"])
+
+    async def test_evidence_assembly_prompt_warns_absence_is_not_exclusion_evidence(self):
+        plan = await plan_auto_context(
+            message='Can I say this relation has no plausible connection?',
+            selected_context_count=0,
+            notes=[],
+            action_value_hints=[],
+            max_variants=2,
+            allow_llm_refine=False,
+        )
+        assembly = _evidence_assembly(
+            message='Can I say this relation has no plausible connection?',
+            plan=plan,
+            snippets=[],
+            level_reports=[],
+        )
+
+        self.assertIn("absence of a relation", assembly["prompt_context"].lower())
+        self.assertIn("no plausible connection", assembly["prompt_context"].lower())
+
     async def test_unanchored_early_hit_feedback_does_not_poison_later_queries(self):
         old_llm_refine = settings.memory.auto_context_llm_refine
         old_k = settings.memory.auto_context_k

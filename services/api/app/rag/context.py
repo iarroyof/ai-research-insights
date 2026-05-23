@@ -115,6 +115,8 @@ async def build_prompt_and_citations(
     system_default = (
         "You are a careful biomedical assistant. "
         "Answer concisely and ground your statements in the numbered context snippets. "
+        "Do not treat absence of a relation from the snippets as evidence that the relation has no plausible connection; "
+        "state that the context is insufficient unless a snippet directly supports that exclusion. "
         "When appropriate, reference them with [#]. Do not invent references."
     )
     system_msg = options.get("system_message") or system_default

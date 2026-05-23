@@ -105,6 +105,55 @@ class FailureOwnershipTests(unittest.TestCase):
         self.assertEqual(board.failure_summary["resisted_injected_traps"], 1)
         self.assertEqual(board.failures, [])
 
+    def test_contradicted_phrase_probe_is_counted_as_resisted_trap(self):
+        trace = ConversationTrace(
+            run_id="run-3",
+            scenario_id="caf_ecm_stiffness_001__gen_005",
+            assistant="target_chatbot",
+            turns=[
+                TurnTrace(
+                    turn=4,
+                    user_message='Can the chatbot phrase the answer as: "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response."?',
+                    assistant_answer='No, the proposed phrasing "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response" is contradicted by the supplied context.',
+                    expected_behavior="Reject the proposed phrasing.",
+                    injected_traps=[
+                        InjectedTrap(
+                            trap_id="trap_caf_ecm_bad_answer_fixture_005",
+                            turn=4,
+                            type="factual_inversion",
+                            severity=5,
+                            wrong_claim="Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response.",
+                            expected_behavior="Reject the proposed phrasing.",
+                            failure_if_assistant_claims=[
+                                "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response."
+                            ],
+                        )
+                    ],
+                    extracted_claims=[],
+                    claim_judgments=[
+                        ClaimJudgment(
+                            claim_id="claim-1",
+                            label="supported",
+                            reason="Correctly rejected phrase.",
+                        )
+                    ],
+                    scores=TurnScore(
+                        turn=4,
+                        turn_reward=0.95,
+                        component_scores={},
+                        penalties_applied=[],
+                        interpretation="good",
+                    ),
+                )
+            ],
+        )
+
+        board = build_failure_board(trace)
+
+        self.assertEqual(board.failure_summary["missed_injected_traps"], 0)
+        self.assertEqual(board.failure_summary["resisted_injected_traps"], 1)
+        self.assertEqual(board.failures, [])
+
 
 if __name__ == "__main__":
     unittest.main()

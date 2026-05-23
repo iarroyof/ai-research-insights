@@ -1,4 +1,5 @@
 # services/api/app/routers/chat.py
+import re
 import uuid
 import json
 import time
@@ -104,6 +105,21 @@ def _native_history_messages(context_plan, limit: int = 12) -> List[Dict[str, st
     return messages[-limit:]
 
 
+def _display_terms(items: Any, *, limit: int = 5) -> str:
+    if not isinstance(items, list):
+        return ""
+    out: List[str] = []
+    for item in items:
+        text = str(item or "").strip()
+        if not text or text.lower() in {"answer", "again", "now", "question", "evidence"}:
+            continue
+        if text not in out:
+            out.append(text)
+        if len(out) >= limit:
+            break
+    return ", ".join(out)
+
+
 def _opening_clarification_prefix(evidence_assembly: Dict[str, Any] | None) -> str:
     assembly = evidence_assembly or {}
     if not assembly.get("clarification_recommended"):
@@ -114,8 +130,28 @@ def _opening_clarification_prefix(evidence_assembly: Dict[str, Any] | None) -> s
         if item.get("label") or item.get("frame_id")
     ]
     frame_text = ", ".join(frames) if frames else "the most relevant evidence frame"
+    puzzle = assembly.get("evidence_puzzle") or {}
+    covered = _display_terms(puzzle.get("covered_nodes"), limit=5)
+    missing = _display_terms(puzzle.get("missing_nodes"), limit=5)
+    edge_status = str(puzzle.get("edge_support_status") or "uncertain").strip() or "uncertain"
+    level_counts = assembly.get("level_result_counts") or {}
+    level_summary = ", ".join(
+        f"{level}:{count}"
+        for level, count in level_counts.items()
+        if count
+    )
+    reasoning_parts: List[str] = []
+    if covered:
+        reasoning_parts.append(f"retrieval covers {covered}")
+    if missing:
+        reasoning_parts.append(f"the unresolved bridge includes {missing}")
+    reasoning_parts.append(f"edge support is {edge_status}")
+    if level_summary:
+        reasoning_parts.append(f"retrieved levels {level_summary}")
+    reasoning = "; ".join(reasoning_parts)
     return (
         "I will assemble the supported evidence pieces first and keep missing links explicit. "
+        f"From the current evidence puzzle, {reasoning}. "
         f"To refine the explanation, which interpretation should lead: {frame_text}?\n\n"
     )
 
@@ -126,6 +162,37 @@ def _hold_generation_for_clarification(evidence_assembly: Dict[str, Any] | None)
         return False
     edge_status = ((assembly.get("evidence_puzzle") or {}).get("edge_support_status") or "").lower()
     return edge_status in {"missing", "partial"}
+
+
+def _is_scope_or_memory_correction_only(message: str) -> bool:
+    lower = (message or "").strip().lower()
+    if not lower or "?" in lower:
+        return False
+    correction_markers = (
+        "from now on",
+        "going forward",
+        "for the rest of",
+        "remember that",
+        "please remember",
+        "stay only",
+        "focus only",
+        "keep the scope",
+        "do not drift",
+        "don't drift",
+        "not clinical",
+        "not treatment",
+    )
+    return any(marker in lower for marker in correction_markers)
+
+
+def _correction_acknowledgement(message: str) -> str:
+    correction = re.sub(r"\s+", " ", (message or "").strip())
+    if len(correction) > 500:
+        correction = correction[:497].rstrip() + "..."
+    return (
+        "Understood. I will treat this as a session scope correction: "
+        f"{correction}. I will use it to constrain later retrieval and answers unless you explicitly ask to revisit it."
+    )
 
 
 @router.post("/memory/correction")
@@ -253,6 +320,7 @@ async def chat(req: Request, body: ChatRequest):
     # Session handling
     session_id = body.session_id or str(uuid.uuid4())
     started_at = time.monotonic()
+    correction_only_turn = _is_scope_or_memory_correction_only(body.message)
     
     # Resolve pinned selections to exact snippets
     pinned_items = []
@@ -273,6 +341,7 @@ async def chat(req: Request, body: ChatRequest):
         and settings.memory.enabled
         and body.options.allow_auto_context
         and settings.memory.auto_context_enabled
+        and not correction_only_turn
     ):
         try:
             auto_payload = await build_auto_context(
@@ -365,6 +434,8 @@ async def chat(req: Request, body: ChatRequest):
                     "Do not add outside biomedical mechanisms, examples, mediators, therapies, or pathway steps "
                     "when the supplied context does not directly support them. If a relation is only plausible "
                     "from general knowledge, label it as not supported by the supplied context instead of explaining it as true. "
+                    "Do not treat missing evidence in the current snippets as evidence that a relation has no plausible connection; "
+                    "say the supplied context is insufficient for that exclusion unless a cited snippet directly supports the exclusion. "
                     "Avoid 'known', 'plausible', 'implies', 'suggests', and 'likely' for a relation unless the cited context directly supports that relation."
                 ),
             },
@@ -394,7 +465,11 @@ async def chat(req: Request, body: ChatRequest):
             (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
         )
         # Stream model tokens - parse OpenAI JSON chunks
-        if not hold_for_clarification:
+        if correction_only_turn:
+            correction_ack = _correction_acknowledgement(body.message)
+            answer_parts.append(correction_ack)
+            yield {"type": "token", "data": correction_ack}
+        elif not hold_for_clarification:
             async for chunk in llm.chat_stream(messages):
                 # Parse OpenAI-format JSON chunk
                 if chunk == "[DONE]":

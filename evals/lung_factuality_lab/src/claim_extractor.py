@@ -7,7 +7,7 @@ from evals.lung_factuality_lab.src.schemas import ExtractedClaim, Relation
 
 
 ENTITY_ALIASES = {
-    "CAF": ["caf", "cancer-associated fibroblast", "fibroblast"],
+    "CAF": ["caf", "cafs", "cancer-associated fibroblast", "cancer-associated fibroblasts", "fibroblast"],
     "HGF": ["hgf", "hepatocyte growth factor"],
     "MET/c-MET": ["met", "c-met", "met/c-met"],
     "EMT": ["emt", "epithelial-mesenchymal"],

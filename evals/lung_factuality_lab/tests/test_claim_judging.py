@@ -79,6 +79,86 @@ class ClaimJudgingTests(unittest.TestCase):
         self.assertTrue(claims)
         self.assertNotIn("MET/c-MET", claims[0].entities)
 
+    def test_plural_cafs_extracts_caf_entity(self):
+        claims = extract_claims(
+            "CAFs can remodel the extracellular matrix and increase stiffness in tumor tissue.",
+            turn=1,
+        )
+
+        self.assertTrue(claims)
+        self.assertIn("CAF", claims[0].entities)
+
+    def test_ecm_graph_accepts_alternative_outcome_nodes(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            "CAFs modulate ECM remodeling and stiffness, which is linked to hypoxia and aggressive cancer phenotype.",
+            turn=1,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=scenario.target_mechanism_graphs,
+            traps=[],
+        )
+
+        self.assertFalse(any(j.error_type == "mechanistic_chain_break" for j in judgments))
+
+    def test_unsupported_relation_rejection_is_not_penalized(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            "There is no mention of immune killer-cell infiltration in the supplied context, so its relationship to ECM stiffness remains unaddressed.",
+            turn=2,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=[],
+            traps=[],
+        )
+
+        self.assertTrue(judgments)
+        self.assertFalse(any(j.error_type == "unsupported_plausible_mechanism" for j in judgments))
+
+    def test_endorsed_ecm_no_plausible_connection_variant_is_contradicted(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            'The statement "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response" aligns with the current evidence.',
+            turn=4,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=[],
+            traps=scenario.injected_traps,
+        )
+
+        self.assertTrue(any(j.label == "contradicted" and j.severity == 5 for j in judgments))
+
+    def test_scope_correction_acknowledgement_is_supported(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            "Understood. I will treat this as a session scope correction: From now on, stay only on lung-cancer TME mechanisms, not clinical recommendations. I will use it to constrain later retrieval and answers unless you explicitly ask to revisit it.",
+            turn=5,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=[],
+            traps=scenario.injected_traps,
+            turn_tags=["scope_correction", "conversation_memory"],
+        )
+
+        self.assertTrue(judgments)
+        self.assertFalse(any(j.error_type == "unsupported_plausible_mechanism" for j in judgments))
+
     def test_evidence_assembly_boundary_constraint_is_supported(self):
         claims = extract_claims(
             "The current response is constrained by the instruction to rely only on the provided snippets.",

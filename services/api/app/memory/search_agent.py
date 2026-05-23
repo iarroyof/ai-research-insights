@@ -332,11 +332,48 @@ FOLLOWUP_CONTEXT_MARKERS = {
     "answer again", "give me a one-paragraph version", "keep biomedical direction",
     "keep direction correct", "novice user", "one paragraph version",
     "one-paragraph version", "summarize that", "rewrite that",
+    "can the chatbot phrase", "can i phrase", "could i phrase", "phrase the answer",
+    "phrasing", "the statement", "this statement", "that statement",
 }
 
 
 def _is_followup_reference(message: str) -> bool:
     return _contains_any(message, FOLLOWUP_CONTEXT_MARKERS)
+
+
+def _is_rewrite_or_diagnostic_followup(message: str) -> bool:
+    return _contains_any(
+        message,
+        {
+            "answer again",
+            "give me a one-paragraph version",
+            "novice user",
+            "one paragraph version",
+            "one-paragraph version",
+            "summarize that",
+            "rewrite that",
+            "reward model",
+            "evaluator",
+            "trace evidence",
+            "before changing code",
+        },
+    )
+
+
+def _is_phrase_evaluation(message: str) -> bool:
+    return _contains_any(
+        message,
+        {
+            "can the chatbot phrase",
+            "can i phrase",
+            "could i phrase",
+            "phrase the answer",
+            "phrasing",
+            "the statement",
+            "this statement",
+            "that statement",
+        },
+    )
 
 
 def _prior_frame_variants(notes: list[dict[str, Any]], limit: int = 2) -> list[SearchQueryVariant]:
@@ -825,10 +862,14 @@ def _evidence_assembly(
         edge_status = "partial"
     else:
         edge_status = "missing"
+    suppress_clarification_hold = _is_rewrite_or_diagnostic_followup(message) or _is_phrase_evaluation(message)
     clarification_needed = (
-        ambiguity == "high"
-        or (ambiguity == "medium" and edge_status == "missing")
-        or (bool(prior_frame_queries) and _is_followup_reference(message) and edge_status != "supported")
+        not suppress_clarification_hold
+        and (
+            ambiguity == "high"
+            or (ambiguity == "medium" and edge_status == "missing")
+            or (bool(prior_frame_queries) and _is_followup_reference(message) and edge_status != "supported")
+        )
     )
     frame_summaries = [
         {
@@ -847,6 +888,12 @@ def _evidence_assembly(
             f"Ask which evidence frame should lead ({', '.join(frame_labels)}). Do not use a UI choice widget. "
             "Ask only this opening clarification; do not repeat it later as A/B/C or numbered frame choices.\n"
         )
+    phrase_eval_line = ""
+    if _is_phrase_evaluation(message):
+        phrase_eval_line = (
+            "- The user is asking whether a proposed phrasing/statement is acceptable. "
+            "Judge the proposed wording first as supported, unsupported, contradicted, or too broad; do not answer an earlier content request instead.\n"
+        )
     prompt_context = (
         "Auto-context evidence assembly:\n"
         f"- Information need: {_intent_bucket(message)}.\n"
@@ -855,8 +902,11 @@ def _evidence_assembly(
         f"- Retrieved evidence levels: {', '.join(level for level, count in result_levels.items() if count) or 'none'}.\n"
         f"- Candidate evidence frames: {', '.join(str(frame.get('label')) for frame in frame_summaries[:4]) or 'literal'}.\n"
         f"{clarification_line}"
+        f"{phrase_eval_line}"
         "- Treat retrieved snippets as evidence pieces, not a completed causal chain. "
         "Do not assert a bridge between pieces unless the supplied context supports that bridge. "
+        "Absence of a relation from the current snippets is not evidence that the relation has no plausible connection; "
+        "for quoted negative/exclusion claims, answer that the supplied context is insufficient unless evidence directly supports the exclusion. "
         "Do not fill a missing edge with a new example or mediator that is absent from the supplied snippets. "
         "Do not name absent example candidates merely to illustrate a missing edge. "
         "Do not name a candidate therapy, agent, framework, pathway, or experiment unless the supplied context supports that named candidate. "

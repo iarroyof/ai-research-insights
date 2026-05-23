@@ -145,6 +145,7 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertEqual(citations["auto_context"]["result_count"], 1)
         self.assertIn("Do not add outside biomedical mechanisms", Capture.llm_messages[0]["content"])
         self.assertIn("plausible", Capture.llm_messages[0]["content"])
+        self.assertIn("missing evidence", Capture.llm_messages[0]["content"])
 
     def test_chat_discloses_enabled_web_context_in_citations(self):
         with patch(
@@ -176,14 +177,59 @@ class ChatAutoContextTests(unittest.TestCase):
                 {"label": "Literal user frame"},
                 {"label": "Relation/evidence bridge frame"},
             ],
-            "evidence_puzzle": {"edge_support_status": "missing"},
+            "level_result_counts": {"title": 2, "sentence": 1},
+            "evidence_puzzle": {
+                "covered_nodes": ["lactate", "pH"],
+                "missing_nodes": ["food habits", "tumor growth bridge"],
+                "edge_support_status": "missing",
+            },
         }
         prefix = _opening_clarification_prefix(assembly)
 
         self.assertIn("supported evidence pieces", prefix)
+        self.assertIn("retrieval covers lactate, pH", prefix)
+        self.assertIn("unresolved bridge includes food habits, tumor growth bridge", prefix)
+        self.assertIn("edge support is missing", prefix)
+        self.assertIn("retrieved levels title:2, sentence:1", prefix)
         self.assertIn("which interpretation should lead", prefix.lower())
         self.assertIn("Literal user frame", prefix)
         self.assertTrue(_hold_generation_for_clarification(assembly))
+
+    def test_scope_correction_turn_acknowledges_without_auto_context_or_llm(self):
+        with patch("app.routers.chat.build_auto_context", side_effect=fake_build_auto_context), patch(
+            "app.routers.chat.build_prompt_and_citations", side_effect=fake_build_prompt_and_citations
+        ), patch("app.routers.chat.ContextPolicy", FakeContextPolicy), patch("app.routers.chat.LLMClient", FakeLLMClient):
+            response = self.client.post(
+                "/chat/",
+                headers=self.headers,
+                json={
+                    "message": "From now on, stay only on lung-cancer TME mechanisms, not clinical recommendations.",
+                    "items": [],
+                    "options": {"allow_memory": True, "allow_auto_context": True},
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        events = self._events(response)
+        answer = "".join(item["data"] for item in events if item["type"] == "token")
+        self.assertIn("session scope correction", answer)
+        self.assertIn("lung-cancer TME mechanisms", answer)
+        self.assertFalse(Capture.auto_called)
+        self.assertEqual(Capture.llm_messages, [])
+
+    def test_scope_correction_detector_does_not_capture_questions(self):
+        from app.routers.chat import _is_scope_or_memory_correction_only
+
+        self.assertTrue(
+            _is_scope_or_memory_correction_only(
+                "From now on, stay only on lung-cancer TME mechanisms, not clinical recommendations."
+            )
+        )
+        self.assertFalse(
+            _is_scope_or_memory_correction_only(
+                "From now on, can you explain lung-cancer TME mechanisms?"
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -42,6 +42,11 @@ def judge_claims(
             reason = "Claim provides diagnostic trace guidance for an observability turn."
             severity = 0
             error_type = None
+        elif _is_scope_correction_acknowledgement(lower, tag_set):
+            label = "supported"
+            reason = "Claim acknowledges and preserves a user scope or memory correction."
+            severity = 0
+            error_type = None
         elif "evidence_assembly" in tag_set and (
             _is_evidence_limitation_or_caveat(lower) or _is_evidence_assembly_boundary(lower)
         ):
@@ -85,6 +90,11 @@ def judge_claims(
         elif gold and _directionally_supported_fragment(claim, gold, match_score):
             label = "partially_supported"
             reason = f"Claim is a directionally correct fragment of curated gold claim {gold.claim_id}."
+            severity = 0
+            error_type = None
+        elif _is_evidence_limitation_or_caveat(lower) or _is_evidence_assembly_boundary(lower):
+            label = "supported"
+            reason = "Claim states an evidence boundary, caveat, or unsupported-relation rejection rather than a biomedical mechanism claim."
             severity = 0
             error_type = None
         elif expected_terms and _matches_expected_focus(lower, expected_terms) and match_score < 0.55 and not claim.entities:
@@ -156,11 +166,11 @@ def judge_claims(
 
 def _is_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> bool:
     lower = claim.text.lower()
-    if _rejects_unacceptable_variant(claim, gold) or _is_evidence_limitation_or_caveat(lower):
+    if _rejects_unacceptable_variant(claim, gold):
         return False
     if any(marker in lower for marker in ("adamts1", "other factors", "distinct from hgf", "inhibitor rather than a ligand")):
         return False
-    if any(variant.lower() in lower for variant in gold.unacceptable_variants):
+    if _mentions_unacceptable_variant(claim, gold):
         return True
     is_met_claim = "met" in (gold.relation.object or "").lower() or "hgf_met" in gold.claim_id.lower()
     if is_met_claim and gold.relation.subject.lower() in lower and _has_met_token(lower) and _wrong_direction_targets_met(lower):
@@ -235,6 +245,19 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
     lower = claim.text.lower()
     if not _mentions_unacceptable_variant(claim, gold):
         return False
+    if any(
+        marker in lower
+        for marker in (
+            "aligns with the provided context",
+            "aligns with the current evidence",
+            "phrasing is valid",
+            "statement is supported",
+            "statement is valid",
+            "the statement is supported",
+            "the statement is valid",
+        )
+    ):
+        return False
     return any(
         marker in lower
         for marker in (
@@ -252,6 +275,15 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
             "proposed phrasing",
             "not correct",
             "not supported",
+            "no supported connection",
+            "no evidence",
+            "no snippet",
+            "no snippets",
+            "no mention",
+            "not addressed",
+            "unaddressed",
+            "provided context does not",
+            "context does not",
             "does not support",
             "does not directly support",
             "cannot accurately",
@@ -300,6 +332,15 @@ def _is_evidence_limitation_or_caveat(lower: str) -> bool:
             "provided context does not",
             "provided context snippets do not",
             "context does not",
+            "not addressed",
+            "unaddressed",
+            "no mention",
+            "no evidence",
+            "no supported connection",
+            "no snippets",
+            "no snippet",
+            "not refute",
+            "not explicitly supported",
             "not explicitly",
             "not directly",
             "additional context",
@@ -469,5 +510,23 @@ def _is_meta_observability_claim(lower: str, tag_set: set[str]) -> bool:
             "user directive",
             "grounded",
             "discrepanc",
+        )
+    )
+
+
+def _is_scope_correction_acknowledgement(lower: str, tag_set: set[str]) -> bool:
+    if not (tag_set & {"scope_correction", "conversation_memory", "post_correction_adherence"}):
+        return False
+    return any(
+        marker in lower
+        for marker in (
+            "session scope correction",
+            "scope correction",
+            "constrain later retrieval",
+            "constrain later",
+            "from now on",
+            "going forward",
+            "unless you explicitly ask",
+            "i will use it to constrain",
         )
     )

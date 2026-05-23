@@ -329,6 +329,9 @@ FOLLOWUP_CONTEXT_MARKERS = {
     "as above", "candidate framework", "candidate frameworks", "continue", "develop",
     "earlier", "latest candidate", "previous", "start by", "suggested", "those",
     "use what is actually supported", "what is actually supported",
+    "answer again", "give me a one-paragraph version", "keep biomedical direction",
+    "keep direction correct", "novice user", "one paragraph version",
+    "one-paragraph version", "summarize that", "rewrite that",
 }
 
 

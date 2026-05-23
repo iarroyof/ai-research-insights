@@ -389,6 +389,32 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan.variants[0].label, "prior_frame")
         self.assertTrue(any(item.label == "prior_frame" for item in plan.variants))
 
+    async def test_style_rewrite_followup_reuses_prior_biomedical_frame(self):
+        plan = await plan_auto_context(
+            message="Give me a one-paragraph version for a novice user, but keep the biomedical direction correct.",
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior query was about CAF-associated ECM remodeling and matrix stiffness.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "biomedical_synonyms",
+                                "query": "caf cancer associated fibroblast ecm extracellular matrix stiffness remodeling",
+                                "source": "deterministic",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        self.assertEqual(plan.variants[0].label, "prior_frame")
+        self.assertIn("cancer associated fibroblast", plan.variants[0].query.lower())
+
     async def test_followup_evidence_puzzle_uses_prior_frame_nodes(self):
         plan = await plan_auto_context(
             message="Use what is actually supported and separate direct evidence from hypotheses.",

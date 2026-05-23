@@ -1,0 +1,38 @@
+{
+  "corpus_id": "lung_factuality_generated_corpus_v1",
+  "pass_1_source_grounding": {
+    "status": "completed_manual_source_matrix",
+    "checked_items": [
+      "lc_tme_caf_hgf_met_001",
+      "lc_tme_tam_m2_cd8_001",
+      "lc_tme_hypoxia_hif_pd_l1_001",
+      "lc_tme_mdsc_treg_cd8_001",
+      "lc_tme_caf_ecm_stiffness_001",
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "description": "Each true claim and unacceptable variant was built from a curated source-grounded fact matrix. The report lists the source rationale."
+  },
+  "pass_2_polarity_and_false_claim_audit": {
+    "status": "passed",
+    "checks": [
+      {
+        "name": "no_must_not_claim_in_must_mention",
+        "passed": true
+      }
+    ]
+  },
+  "pass_3_schema_and_trace_observability_audit": {
+    "status": "passed",
+    "checks": [
+      {
+        "name": "required_fields_present",
+        "passed": true
+      },
+      {
+        "name": "scenario_and_gold_ids_link",
+        "passed": true
+      }
+    ]
+  },
+  "issues": []
+}

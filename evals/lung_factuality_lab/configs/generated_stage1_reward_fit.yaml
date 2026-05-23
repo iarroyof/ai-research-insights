@@ -1,0 +1,5 @@
+{
+  "batch_id": "lung_factuality_stage1_reward_fit_v1",
+  "scenario_filter": "generated",
+  "generated_variant_indices": [0]
+}

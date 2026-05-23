@@ -1,0 +1,13 @@
+{
+  "batch_id": "lung_factuality_semantic_drift_holdout_v1",
+  "scenarios": [
+    "caf_ecm_stiffness_001__gen_006",
+    "citation_drift_lung_vs_general_oncology_001__gen_007",
+    "correction_scope_tme_only_001__gen_008",
+    "cross_cancer_transfer_001__gen_006",
+    "expert_hgf_met_direction_001__gen_007",
+    "expert_tam_cd8_immunosuppression_001__gen_008",
+    "hypoxia_immune_escape_001__gen_006",
+    "mdsc_treg_suppression_001__gen_007"
+  ]
+}

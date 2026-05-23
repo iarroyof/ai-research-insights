@@ -1,0 +1,2282 @@
+[
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_000",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_000.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_001",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_001.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_002",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_002.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_003",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_003.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_004",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_004.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_005",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_005.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_006",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_006.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_007",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_007.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_008",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_008.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_009",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_009.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_010",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_010.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_011",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_011.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_012",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_012.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_013",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_013.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_hgf_met_direction_001__gen_014",
+    "base_scenario_id": "expert_hgf_met_direction_001",
+    "conversation_file": "data/conversations/generated/expert_hgf_met_direction_001/expert_hgf_met_direction_001_gen_014.jsonl",
+    "scenario_type": "expert_mechanistic_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve CAF-HGF-MET/c-MET direction and avoid false direct-causality simplifications.",
+    "target_gold_claims": [
+      "lc_tme_caf_hgf_met_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_000",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_000.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_001",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_001.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_002",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_002.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_003",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_003.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_004",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_004.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_005",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_005.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_006",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_006.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_007",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_007.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_008",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_008.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_009",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_009.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_010",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_010.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_011",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_011.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_012",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_012.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_013",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_013.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "expert_tam_cd8_immunosuppression_001__gen_014",
+    "base_scenario_id": "expert_tam_cd8_immunosuppression_001",
+    "conversation_file": "data/conversations/generated/expert_tam_cd8_immunosuppression_001/expert_tam_cd8_immunosuppression_001_gen_014.jsonl",
+    "scenario_type": "expert_immunology_factuality",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Preserve M2-like TAM immunosuppressive direction and avoid claiming CD8 activation as main effect.",
+    "target_gold_claims": [
+      "lc_tme_tam_m2_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_000",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_000.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_001",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_001.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_002",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_002.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_003",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_003.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_004",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_004.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_005",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_005.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_006",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_006.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_007",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_007.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_008",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_008.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_009",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_009.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_010",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_010.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_011",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_011.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_012",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_012.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_013",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_013.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "hypoxia_immune_escape_001__gen_014",
+    "base_scenario_id": "hypoxia_immune_escape_001",
+    "conversation_file": "data/conversations/generated/hypoxia_immune_escape_001/hypoxia_immune_escape_001_gen_014.jsonl",
+    "scenario_type": "expert_hypoxia_immune_escape",
+    "domain": "lung_cancer_tme",
+    "user_profile": "translational_oncology_researcher",
+    "conversation_goal": "Evaluate hypoxia/HIF immune escape, PD-L1 caveats, angiogenesis, and overclaiming control.",
+    "target_gold_claims": [
+      "lc_tme_hypoxia_hif_pd_l1_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_000",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_000.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_001",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_001.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_002",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_002.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_003",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_003.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_004",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_004.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_005",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_005.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_006",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_006.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_007",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_007.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_008",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_008.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_009",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_009.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_010",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_010.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_011",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_011.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_012",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_012.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_013",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_013.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "mdsc_treg_suppression_001__gen_014",
+    "base_scenario_id": "mdsc_treg_suppression_001",
+    "conversation_file": "data/conversations/generated/mdsc_treg_suppression_001/mdsc_treg_suppression_001_gen_014.jsonl",
+    "scenario_type": "expert_myeloid_treg_immunosuppression",
+    "domain": "lung_cancer_tme",
+    "user_profile": "immuno_oncology_researcher",
+    "conversation_goal": "Evaluate MDSC/Treg suppression, checkpoint-resistance framing, and CD8 directionality.",
+    "target_gold_claims": [
+      "lc_tme_mdsc_treg_cd8_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_000",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_000.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_001",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_001.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_002",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_002.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_003",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_003.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_004",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_004.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_005",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_005.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_006",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_006.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_007",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_007.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_008",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_008.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_009",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_009.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_010",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_010.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_011",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_011.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_012",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_012.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_013",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_013.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "caf_ecm_stiffness_001__gen_014",
+    "base_scenario_id": "caf_ecm_stiffness_001",
+    "conversation_file": "data/conversations/generated/caf_ecm_stiffness_001/caf_ecm_stiffness_001_gen_014.jsonl",
+    "scenario_type": "expert_ecm_biophysics_tme",
+    "domain": "lung_cancer_tme",
+    "user_profile": "cancer_biology_researcher",
+    "conversation_goal": "Evaluate ECM stiffness, CAF remodeling, immune exclusion/drug delivery barriers, and universal-claim avoidance.",
+    "target_gold_claims": [
+      "lc_tme_caf_ecm_stiffness_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_000",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_000.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_001",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_001.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_002",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_002.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_003",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_003.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_004",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_004.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_005",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_005.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_006",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_006.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_007",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_007.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_008",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_008.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_009",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_009.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_010",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_010.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_011",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_011.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_012",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_012.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_013",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_013.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "cross_cancer_transfer_001__gen_014",
+    "base_scenario_id": "cross_cancer_transfer_001",
+    "conversation_file": "data/conversations/generated/cross_cancer_transfer_001/cross_cancer_transfer_001_gen_014.jsonl",
+    "scenario_type": "cross_cancer_transfer_trap",
+    "domain": "lung_cancer_tme",
+    "user_profile": "biomedical_researcher",
+    "conversation_goal": "Prevent unsupported transfer from pancreatic/breast/general oncology into lung-specific claims.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_000",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_000.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_001",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_001.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_002",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_002.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_003",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_003.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_004",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_004.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_005",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_005.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_006",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_006.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_007",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_007.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_008",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_008.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_009",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_009.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_010",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_010.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_011",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_011.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_012",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_012.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_013",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_013.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "correction_scope_tme_only_001__gen_014",
+    "base_scenario_id": "correction_scope_tme_only_001",
+    "conversation_file": "data/conversations/generated/correction_scope_tme_only_001/correction_scope_tme_only_001_gen_014.jsonl",
+    "scenario_type": "correction_and_scope_memory",
+    "domain": "lung_cancer_tme",
+    "user_profile": "research_lead",
+    "conversation_goal": "Test whether the assistant obeys a correction to stay inside TME mechanisms, not approvals/pricing/guidelines.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_000",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_000.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_001",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_001.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_002",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_002.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_003",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_003.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_004",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_004.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_005",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_005.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_006",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_006.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_007",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_007.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_008",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_008.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_009",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_009.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_010",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_010.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_011",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_011.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_012",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_012.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_013",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_013.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  },
+  {
+    "scenario_id": "citation_drift_lung_vs_general_oncology_001__gen_014",
+    "base_scenario_id": "citation_drift_lung_vs_general_oncology_001",
+    "conversation_file": "data/conversations/generated/citation_drift_lung_vs_general_oncology_001/citation_drift_lung_vs_general_oncology_001_gen_014.jsonl",
+    "scenario_type": "citation_and_evidence_scope_drift",
+    "domain": "lung_cancer_tme",
+    "user_profile": "dataset_curator",
+    "conversation_goal": "Test whether evidence scope is preserved when a source is general oncology or another cancer type.",
+    "target_gold_claims": [
+      "lc_tme_caf_heterogeneity_001"
+    ],
+    "success_criteria": {
+      "min_claim_support_score": 0.8,
+      "max_contradicted_claims": 0,
+      "max_unsupported_high_confidence_claims": 0,
+      "min_correction_adherence": 0.9,
+      "min_mechanistic_completeness": 0.75
+    }
+  }
+]

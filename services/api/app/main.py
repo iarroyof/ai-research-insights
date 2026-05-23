@@ -1,7 +1,7 @@
 # services/api/app/main.py
 from __future__ import annotations
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .middleware.security import SecurityMiddleware  # Fixed: was ApiKeyMiddleware
@@ -35,9 +35,25 @@ app.add_middleware(SecurityMiddleware)  # Fixed: was ApiKeyMiddleware
 app.add_middleware(TenantMiddleware)
 
 # Health endpoint
+@app.get("/")
+def root():
+    return {
+        "name": settings.app.name,
+        "status": "ok",
+        "health": "/health",
+        "docs": "/docs",
+        "chat": "/chat/",
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
 
 # Mount routers
 app.include_router(search_router.router)

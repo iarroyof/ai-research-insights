@@ -40,12 +40,53 @@ minio:
   bucket: papers
 
 llm:
-  base_url: http://llm:8000/v1
-  model: ${LLM_MODEL_ID}
+  base_url: ${LLM_BASE_URL:-http://llm:8000/v1}
+  model: ${LLM_MODEL_ID:-}
+  chat_provider: ${LLM_CHAT_PROVIDER:-nvidia}
   max_input_tokens: 6000
   max_output_tokens: 512
   temperature: 0.2
   top_p: 1.0
+  context_manager_provider: ${CONTEXT_MANAGER_PROVIDER:-nvidia}
+  context_manager_model: ${CONTEXT_MANAGER_MODEL:-}
+  nvidia_base_url: ${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+  nvidia_api_key: ${NVIDIA_API_KEY:-}
+  nvidia_model: ${NVIDIA_MODEL:-nvidia/llama-3.3-nemotron-super-49b-v1.5}
+  nvidia_max_tokens: ${NVIDIA_MAX_TOKENS:-2048}
+  nvidia_reasoning_effort: ${NVIDIA_REASONING_EFFORT:-}
+  nvidia_enable_thinking: null
+
+memory:
+  enabled: true
+  working_buffer_turns: 8
+  working_buffer_token_budget: ${MEMORY_WORKING_BUFFER_TOKEN_BUDGET:-1800}
+  memory_k: 8
+  triplet_k: 8
+  web_k: 3
+  token_budget_ratio: 0.45
+  episodic_summary_turns: ${MEMORY_EPISODIC_SUMMARY_TURNS:-6}
+  lifecycle_update_k: ${MEMORY_LIFECYCLE_UPDATE_K:-80}
+  eviction_importance_threshold: ${MEMORY_EVICTION_IMPORTANCE_THRESHOLD:-0.25}
+  allow_web_search_default: false
+  use_llm_reflection: false
+  shared_policy_enabled: false
+  reward_trace_enabled: true
+  auto_context_enabled: ${AUTO_CONTEXT_ENABLED:-true}
+  auto_context_k: ${AUTO_CONTEXT_K:-8}
+  auto_context_query_variants: ${AUTO_CONTEXT_QUERY_VARIANTS:-4}
+  auto_context_llm_refine: ${AUTO_CONTEXT_LLM_REFINE:-true}
+  auto_context_llm_notes: ${AUTO_CONTEXT_LLM_NOTES:-true}
+  contradiction_threshold: 0.35
+  nli_enabled: true
+  nli_provider: ${NLI_PROVIDER:-hf_api}
+  nli_endpoint: ${NLI_ENDPOINT:-}
+  nli_model: ${NLI_MODEL:-pritamdeka/PubMedBERT-MNLI-MedNLI}
+  hf_api_token: ${HF_API_TOKEN:-}
+  hf_api_base_url: ${HF_API_BASE_URL:-https://router.huggingface.co/hf-inference/models}
+  hf_api_timeout_sec: ${HF_API_TIMEOUT_SEC:-45}
+  nli_hf_api_batch_size: ${NLI_HF_API_BATCH_SIZE:-8}
+  nli_min_entailment: ${NLI_MIN_ENTAILMENT:-0.55}
+  nli_contradiction_threshold: ${NLI_CONTRADICTION_THRESHOLD:-0.45}
 
 re:
   primary: rebel

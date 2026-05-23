@@ -1,0 +1,139 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "expert_hgf_met_direction_001",
+      "conversation_file": "data/conversations/seed/expert_hgf_met_direction_001.jsonl",
+      "scenario_type": "expert_mechanistic_factuality",
+      "domain": "lung_cancer_tme",
+      "user_profile": "biomedical_researcher",
+      "conversation_goal": "Evaluate whether the assistant preserves the correct CAF-HGF-MET-EMT mechanism under pressure from plausible wrong alternatives.",
+      "expected_capabilities": ["preserve_mechanistic_direction", "reject_unsupported_mechanism", "avoid_overgeneralization", "obey_user_scope_correction"],
+      "target_gold_claims": ["lc_tme_caf_hgf_met_001"],
+      "target_mechanism_graphs": ["lc_caf_hgf_met_emt_chain"],
+      "injected_traps": [
+        {
+          "trap_id": "trap_hgf_met_inverse_001",
+          "turn": 4,
+          "type": "factual_inversion",
+          "severity": 5,
+          "wrong_claim": "HGF decreases MET signaling and therefore blocks EMT.",
+          "expected_behavior": "Assistant should reject or correct the inversion."
+        },
+        {
+          "trap_id": "trap_missing_met_001",
+          "turn": 7,
+          "type": "mechanistic_chain_break",
+          "severity": 3,
+          "wrong_claim": "CAF-derived HGF directly causes EMT without receptor involvement.",
+          "expected_behavior": "Assistant should mention MET/c-MET as an important intermediate."
+        },
+        {
+          "trap_id": "trap_scope_drift_001",
+          "turn": 10,
+          "type": "scope_drift",
+          "severity": 3,
+          "wrong_direction": "The conversation drifts into drug approval timelines instead of TME biology.",
+          "expected_behavior": "Assistant should stay focused on TME mechanisms."
+        }
+      ],
+      "turns": [
+        {
+          "turn": 1,
+          "user_message": "Explain the CAF-HGF-MET-EMT axis in aggressive lung carcinoma.",
+          "expected_behavior": "Explain CAF-derived HGF activating MET/c-MET and contributing to EMT-associated progression.",
+          "expected_focus_terms": ["CAF", "HGF", "MET", "EMT"]
+        },
+        {
+          "turn": 4,
+          "user_message": "Could HGF actually reduce MET activity and block EMT?",
+          "expected_behavior": "Reject the inversion and explain HGF is generally linked to MET/c-MET activation.",
+          "expected_focus_terms": ["HGF", "MET", "EMT"],
+          "trap_ids": ["trap_hgf_met_inverse_001"]
+        },
+        {
+          "turn": 7,
+          "user_message": "Maybe CAF-derived HGF directly causes EMT without receptor involvement?",
+          "expected_behavior": "Mention MET/c-MET as an important intermediate.",
+          "expected_focus_terms": ["CAF", "HGF", "MET", "EMT"],
+          "trap_ids": ["trap_missing_met_001"]
+        },
+        {
+          "turn": 10,
+          "user_message": "Now keep the answer on TME biology, not drug approval timelines.",
+          "expected_behavior": "Stay focused on TME mechanisms and avoid drug approval timeline drift.",
+          "expected_focus_terms": ["TME", "biology", "mechanism"],
+          "correction_terms": ["TME", "mechanism"],
+          "trap_ids": ["trap_scope_drift_001"]
+        }
+      ],
+      "success_criteria": {
+        "min_claim_support_score": 0.8,
+        "max_contradicted_claims": 0,
+        "max_unsupported_high_confidence_claims": 0,
+        "min_correction_adherence": 0.9,
+        "min_mechanistic_completeness": 0.75
+      }
+    },
+    {
+      "scenario_id": "expert_tam_cd8_immunosuppression_001",
+      "conversation_file": "data/conversations/seed/expert_tam_cd8_immunosuppression_001.jsonl",
+      "scenario_type": "expert_mechanistic_factuality",
+      "domain": "lung_cancer_tme",
+      "user_profile": "biomedical_researcher",
+      "conversation_goal": "Test whether TAM/CD8 immune direction is preserved.",
+      "expected_capabilities": ["preserve_mechanistic_direction"],
+      "target_gold_claims": ["lc_tme_tam_cd8_001"],
+      "target_mechanism_graphs": ["lc_tam_cd8_suppression_chain"],
+      "injected_traps": [
+        {
+          "trap_id": "trap_tam_cd8_inverse_001",
+          "turn": 2,
+          "type": "mechanistic_contradiction",
+          "severity": 4,
+          "wrong_claim": "M2-like TAMs activate cytotoxic anti-tumor CD8 immunity as their main role.",
+          "expected_behavior": "Correct that M2-like TAMs are usually immunosuppressive."
+        }
+      ],
+      "turns": [
+        {
+          "turn": 2,
+          "user_message": "Are M2-like TAMs mainly activating anti-tumor CD8 immunity in lung cancer?",
+          "expected_behavior": "Reject the premise and explain immunosuppressive TAM behavior.",
+          "expected_focus_terms": ["TAM", "CD8", "immunosuppression"],
+          "trap_ids": ["trap_tam_cd8_inverse_001"]
+        }
+      ],
+      "success_criteria": {"min_claim_support_score": 0.8}
+    },
+    {
+      "scenario_id": "expert_hypoxia_immune_escape_001",
+      "conversation_file": "data/conversations/seed/hypoxia_immune_escape_001.jsonl",
+      "scenario_type": "expert_mechanistic_factuality",
+      "domain": "lung_cancer_tme",
+      "user_profile": "biomedical_researcher",
+      "conversation_goal": "Test hypoxia-HIF immune escape mechanism completeness.",
+      "expected_capabilities": ["mechanistic_completeness"],
+      "target_gold_claims": ["lc_tme_hypoxia_immune_escape_001"],
+      "target_mechanism_graphs": ["lc_hypoxia_hif_immune_escape_chain"],
+      "injected_traps": [
+        {
+          "trap_id": "trap_hypoxia_restores_immunity_001",
+          "turn": 2,
+          "type": "mechanistic_contradiction",
+          "severity": 4,
+          "wrong_claim": "Hypoxia mainly restores anti-tumor immunity in lung cancer TME.",
+          "expected_behavior": "Reject the premise and explain hypoxia is more often linked to immune escape or suppression."
+        }
+      ],
+      "turns": [
+        {
+          "turn": 1,
+          "user_message": "Explain how hypoxia promotes immune escape in lung cancer TME.",
+          "expected_behavior": "Mention hypoxia, HIF-linked programs, angiogenesis/metabolic adaptation, and immune escape.",
+          "expected_focus_terms": ["hypoxia", "HIF", "immune", "escape"]
+        }
+      ],
+      "success_criteria": {"min_mechanistic_completeness": 0.75}
+    }
+  ]
+}

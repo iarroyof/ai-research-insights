@@ -1,0 +1,5 @@
+{
+  "sources": [
+    {"source_id": "curated_review_lc_tme_001", "scope": "lung_cancer_tme", "kind": "curated_eval_fixture", "notes": "Synthetic curated registry for eval fixtures, not a literature database."}
+  ]
+}

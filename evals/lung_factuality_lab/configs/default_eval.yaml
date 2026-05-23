@@ -1,0 +1,6 @@
+{
+  "default_assistant": "dummy",
+  "default_dummy_mode": "mixed",
+  "output_format_version": "lung_factuality_lab_v1",
+  "notes": "YAML files are JSON-compatible so the lab runs without PyYAML."
+}

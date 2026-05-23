@@ -1,0 +1,94 @@
+[
+  {
+    "graph_id": "lc_tme_caf_hgf_met_001_graph",
+    "target_gold_claim": "lc_tme_caf_hgf_met_001",
+    "topic": "CAF_HGF_MET_EMT",
+    "required_nodes": [
+      "CAF/stromal fibroblast",
+      "HGF",
+      "MET/c-MET signaling"
+    ],
+    "common_errors": [
+      "HGF decreases MET signaling and therefore blocks EMT.",
+      "CAF-derived HGF directly causes EMT without receptor involvement, so MET/c-MET is unnecessary.",
+      "MET mainly suppresses HGF as the dominant lung-cancer TME mechanism."
+    ]
+  },
+  {
+    "graph_id": "lc_tme_tam_m2_cd8_001_graph",
+    "target_gold_claim": "lc_tme_tam_m2_cd8_001",
+    "topic": "TAM_M2_CD8_IMMUNOSUPPRESSION",
+    "required_nodes": [
+      "M2-like TAMs",
+      "immunosuppression",
+      "effector T cells/CD8+ T cells"
+    ],
+    "common_errors": [
+      "M2-like TAMs mainly activate cytotoxic CD8+ T cells and improve anti-tumor immunity in NSCLC.",
+      "M2-like TAMs are unrelated to immune evasion or therapy resistance in lung cancer.",
+      "High M2-like TAM activity should be treated as a simple marker of stronger anti-tumor immunity."
+    ]
+  },
+  {
+    "graph_id": "lc_tme_hypoxia_hif_pd_l1_001_graph",
+    "target_gold_claim": "lc_tme_hypoxia_hif_pd_l1_001",
+    "topic": "HYPOXIA_HIF_IMMUNE_ESCAPE",
+    "required_nodes": [
+      "hypoxia",
+      "HIF-1α/HIF signaling",
+      "immune escape",
+      "PD-L1 or T-cell dysfunction"
+    ],
+    "common_errors": [
+      "Hypoxia generally improves cytotoxic T-cell function and reduces immune escape in lung cancer.",
+      "HIF-1α has no plausible connection to PD-L1-related immune escape.",
+      "Tumor hypoxia blocks angiogenesis rather than promoting VEGF/angiogenic programs."
+    ]
+  },
+  {
+    "graph_id": "lc_tme_mdsc_treg_cd8_001_graph",
+    "target_gold_claim": "lc_tme_mdsc_treg_cd8_001",
+    "topic": "MDSC_TREG_TCELL_SUPPRESSION",
+    "required_nodes": [
+      "MDSCs",
+      "Tregs",
+      "effector T cells",
+      "immune evasion"
+    ],
+    "common_errors": [
+      "MDSCs primarily enhance antigen presentation and strengthen CD8+ T-cell killing in the tumor microenvironment.",
+      "Tregs in lung cancer mainly activate effector T cells rather than suppressing them.",
+      "MDSC-Treg crosstalk is irrelevant to immune checkpoint resistance."
+    ]
+  },
+  {
+    "graph_id": "lc_tme_caf_ecm_stiffness_001_graph",
+    "target_gold_claim": "lc_tme_caf_ecm_stiffness_001",
+    "topic": "CAF_ECM_STIFFNESS_BARRIER",
+    "required_nodes": [
+      "CAF",
+      "ECM remodeling/stiffness",
+      "invasion or drug delivery or immune infiltration"
+    ],
+    "common_errors": [
+      "ECM stiffness generally improves immune killer-cell infiltration and drug delivery in tumors.",
+      "CAF-associated ECM remodeling is always tumor-suppressive in lung cancer.",
+      "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response."
+    ]
+  },
+  {
+    "graph_id": "lc_tme_caf_heterogeneity_001_graph",
+    "target_gold_claim": "lc_tme_caf_heterogeneity_001",
+    "topic": "CAF_HETEROGENEITY_SCOPE",
+    "required_nodes": [
+      "CAF heterogeneity",
+      "context dependence",
+      "lung cancer"
+    ],
+    "common_errors": [
+      "All CAFs have the same function in all lung tumors.",
+      "CAF evidence from pancreatic or breast cancer can be presented as proven NSCLC evidence without caveats.",
+      "CAFs are only tumor-suppressive and do not contribute to immune suppression or therapy resistance."
+    ]
+  }
+]

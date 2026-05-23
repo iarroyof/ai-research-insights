@@ -1,0 +1,6 @@
+{
+  "errors": [
+    {"error_id": "dangerous_pdl1_irrelevant_001", "type": "dangerous_biomedical_falsehood", "text": "PD-L1 testing is irrelevant for immunotherapy decisions."},
+    {"error_id": "all_cafs_identical_001", "type": "overgeneralization", "text": "All CAFs behave the same way in all tumors."}
+  ]
+}

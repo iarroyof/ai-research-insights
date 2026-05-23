@@ -1,0 +1,8 @@
+{
+  "batch_id": "lung_factuality_microfit_citation_drift_v1",
+  "scenarios": [
+    "citation_drift_lung_vs_general_oncology_001__gen_000",
+    "citation_drift_lung_vs_general_oncology_001__gen_001",
+    "citation_drift_lung_vs_general_oncology_001__gen_002"
+  ]
+}

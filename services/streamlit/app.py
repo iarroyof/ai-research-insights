@@ -264,7 +264,7 @@ if "results" in st.session_state and st.session_state["results"]:
 # MAIN ACTION TABS
 # ------------------------------------------------------------------
 tab_chat, tab_sum, tab_triplets = st.tabs([
-    "💬 Chat (Pinned Context)",
+    "💬 Chat",
     "📝 Summarize (Conditioned)",
     "🕸️ Triplets / Graph"
 ])
@@ -273,7 +273,7 @@ tab_chat, tab_sum, tab_triplets = st.tabs([
 # CHAT TAB
 # ------------------------------------------------------------------
 with tab_chat:
-    st.subheader("Live Chat with Pinned Context")
+    st.subheader("Live Chat")
 
     st.markdown("**Search past chat messages** (server-side substring match in this tenant)")
     hist_q = st.text_input("Find in chat history", placeholder="e.g., PD-1 dosage window")
@@ -303,69 +303,165 @@ with tab_chat:
             for item in selected_items[:5]:
                 st.caption(f"**{item.get('subject')}** - {item.get('relation')} - **{item.get('object')}**")
                 st.text(item.get('text', '')[:200] + "...")
+    else:
+        st.info("No pinned context. Chat will auto-search local evidence when enabled.")
 
-    msg = st.text_area("Message", "Summarize the immune therapy evidence from these sentences.")
+    if "chat_messages" not in st.session_state:
+        st.session_state["chat_messages"] = []
+    if "chat_session_id" not in st.session_state:
+        st.session_state["chat_session_id"] = None
+
+    chat_col, reset_col = st.columns([3, 1])
+    with chat_col:
+        if st.session_state["chat_session_id"]:
+            st.caption(f"Session ID: `{st.session_state['chat_session_id']}`")
+        else:
+            st.caption("New chat session")
+    with reset_col:
+        if st.button("New chat", use_container_width=True):
+            st.session_state["chat_messages"] = []
+            st.session_state["chat_session_id"] = None
+            st.session_state["memory_diagnostics"] = {}
+            st.rerun()
+
     allow_extra = st.checkbox("Allow extra retrieval if pinned < 3", value=False)
+    allow_auto_context = st.checkbox("Auto-search evidence when nothing is pinned", value=True)
+    allow_web_search = st.checkbox("Use privacy-filtered DuckDuckGo context if local memory is sparse", value=False)
+    expose_memory_debug = st.checkbox("Show memory debug events", value=False)
 
-    if st.button("Start Chat", type="primary"):
+    if st.session_state["chat_session_id"]:
+        with st.expander("Session diagnostics"):
+            if "memory_diagnostics" not in st.session_state:
+                st.session_state["memory_diagnostics"] = {}
+
+            diag_targets = [
+                ("Ideas", "ideas"),
+                ("Action values", "action-values"),
+                ("Evidence tables", "evidence-tables"),
+                ("Search notes", "search-notes"),
+            ]
+            diag_cols = st.columns(len(diag_targets))
+            for col, (label, endpoint) in zip(diag_cols, diag_targets):
+                with col:
+                    if st.button(label, key=f"diag_{endpoint}", use_container_width=True):
+                        try:
+                            with httpx.Client(timeout=30) as c:
+                                r = c.get(
+                                    f"{API}/chat/memory/{endpoint}",
+                                    headers=headers,
+                                    params={"session_id": st.session_state["chat_session_id"], "limit": 10},
+                                )
+                                r.raise_for_status()
+                                st.session_state["memory_diagnostics"][endpoint] = r.json()
+                        except Exception as e:
+                            st.session_state["memory_diagnostics"][endpoint] = {"error": str(e)}
+
+            for endpoint, payload in st.session_state["memory_diagnostics"].items():
+                st.caption(endpoint)
+                st.json(payload)
+
+    for entry in st.session_state["chat_messages"]:
+        with st.chat_message(entry.get("role", "assistant")):
+            st.markdown(entry.get("content", ""))
+            if entry.get("citations"):
+                with st.expander("📚 Citations & Sources"):
+                    st.json(entry["citations"])
+            if entry.get("warnings"):
+                with st.expander("Consistency warnings"):
+                    st.json(entry["warnings"])
+            if entry.get("debug"):
+                with st.expander("Memory debug"):
+                    st.json(entry["debug"])
+
+    msg = st.chat_input("Ask a research question")
+
+    if msg:
+        st.session_state["chat_messages"].append({"role": "user", "content": msg})
+        with st.chat_message("user"):
+            st.markdown(msg)
+
         try:
-            with httpx.Client(timeout=None) as c:
-                with c.stream(
-                    "POST",
-                    f"{API}/chat/",
-                    headers=headers,
-                    json={
-                        "message": msg,
-                        "items": selected_items,
-                        "options": {"allow_extra_retrieval": allow_extra}
+            with st.chat_message("assistant"):
+                answer_text = ""
+                citations_data = None
+                warnings_data = []
+                debug_data = {}
+                placeholder = st.empty()
+
+                payload = {
+                    "message": msg,
+                    "items": selected_items,
+                    "options": {
+                        "allow_extra_retrieval": allow_extra,
+                        "allow_auto_context": allow_auto_context,
+                        "allow_web_search": allow_web_search,
+                        "expose_memory_debug": expose_memory_debug,
                     },
-                ) as r:
-                    r.raise_for_status()
+                }
+                if st.session_state["chat_session_id"]:
+                    payload["session_id"] = st.session_state["chat_session_id"]
 
-                    st.write("### 🤖 Answer (streaming)")
+                with httpx.Client(timeout=None) as c:
+                    with c.stream("POST", f"{API}/chat/", headers=headers, json=payload) as r:
+                        r.raise_for_status()
 
-                    answer_text = ""
-                    citations_data = None
-                    placeholder = st.empty()
+                        for line in r.iter_lines():
+                            if not line:
+                                continue
 
-                    for line in r.iter_lines():
-                        if not line:
-                            continue
+                            if isinstance(line, bytes):
+                                line = line.decode("utf-8", errors="ignore")
 
-                        if isinstance(line, bytes):
-                            line = line.decode("utf-8", errors="ignore")
+                            if line.startswith("data:"):
+                                data_str = line[5:].strip()
 
-                        if line.startswith("data:"):
-                            data_str = line[5:].strip()
+                                if data_str == "[DONE]":
+                                    break
 
-                            if data_str == "[DONE]":
-                                break
+                                try:
+                                    data = json.loads(data_str)
+                                    event_type = data.get("type")
 
-                            try:
-                                data = json.loads(data_str)
+                                    if event_type == "token":
+                                        answer_text += data.get("data", "")
+                                        placeholder.markdown(answer_text)
+                                    elif event_type == "citations":
+                                        citations_data = data.get("data", {})
+                                    elif event_type in {"warning", "consistency_warning"}:
+                                        warnings_data.append(data.get("data", {}))
+                                    elif event_type in {"memory_debug", "reward", "evidence_table", "conversation_frame"}:
+                                        debug_data[event_type] = data.get("data", {})
+                                    elif event_type == "final":
+                                        session_id = data.get("data", {}).get("session_id")
+                                        if session_id:
+                                            st.session_state["chat_session_id"] = session_id
 
-                                if data.get("type") == "token":
-                                    answer_text += data.get("data", "")
+                                except json.JSONDecodeError:
+                                    answer_text += data_str
                                     placeholder.markdown(answer_text)
 
-                                elif data.get("type") == "citations":
-                                    citations_data = data.get("data", {})
+                            elif line.startswith("event:"):
+                                continue
 
-                                elif data.get("type") == "final":
-                                    session_id = data.get("data", {}).get("session_id")
-                                    if session_id:
-                                        st.caption(f"Session ID: `{session_id}`")
+                if citations_data:
+                    with st.expander("📚 Citations & Sources"):
+                        st.json(citations_data)
+                if warnings_data:
+                    with st.expander("Consistency warnings"):
+                        st.json(warnings_data)
+                if debug_data:
+                    with st.expander("Memory debug"):
+                        st.json(debug_data)
 
-                            except json.JSONDecodeError:
-                                answer_text += data_str
-                                placeholder.markdown(answer_text)
-
-                        elif line.startswith("event:"):
-                            continue
-
-                    if citations_data:
-                        with st.expander("📚 Citations & Sources"):
-                            st.json(citations_data)
+                st.session_state["chat_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": answer_text,
+                        "citations": citations_data,
+                        "warnings": warnings_data,
+                        "debug": debug_data,
+                    }
+                )
 
         except Exception as e:
             st.error(f"Chat failed: {e}")
@@ -540,4 +636,3 @@ with tab_triplets:
 
     if "graph_triple_ids" in st.session_state:
         st.caption(f"Current graph: **{len(st.session_state['graph_triple_ids'])} triplets**")
-

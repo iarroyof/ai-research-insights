@@ -1,0 +1,8 @@
+{
+  "batch_id": "lung_factuality_microfit_correction_scope_v1",
+  "scenarios": [
+    "correction_scope_tme_only_001__gen_000",
+    "correction_scope_tme_only_001__gen_001",
+    "correction_scope_tme_only_001__gen_002"
+  ]
+}

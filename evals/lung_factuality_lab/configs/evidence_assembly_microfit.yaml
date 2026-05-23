@@ -1,0 +1,7 @@
+{
+  "batch_id": "biomedical_evidence_assembly_microfit",
+  "scenarios": [
+    "biomedical_ambiguous_evidence_assembly_001",
+    "cross_domain_fungal_therapy_assembly_001"
+  ]
+}

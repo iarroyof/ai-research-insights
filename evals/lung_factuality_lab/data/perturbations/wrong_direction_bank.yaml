@@ -1,0 +1,6 @@
+{
+  "wrong_directions": [
+    {"id": "hgf_decreases_met_001", "text": "HGF decreases MET signaling and blocks EMT."},
+    {"id": "tam_activates_cd8_001", "text": "M2-like TAMs activate cytotoxic anti-tumor CD8 immunity as their main role."}
+  ]
+}

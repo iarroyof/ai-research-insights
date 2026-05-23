@@ -1,0 +1,118 @@
+[
+  {
+    "claim_id": "lc_tme_caf_hgf_met_001",
+    "domain": "lung_cancer_tme",
+    "topic": "CAF_HGF_MET_EMT",
+    "claim": "CAF-derived or stromal HGF can activate MET/c-MET signaling and contribute to NSCLC/lung cancer tumor progression, invasion, EMT-like programs, angiogenesis, immune evasion, or therapy resistance depending on context.",
+    "required_nodes": [
+      "CAF/stromal fibroblast",
+      "HGF",
+      "MET/c-MET signaling"
+    ],
+    "unacceptable_variants": [
+      "HGF decreases MET signaling and therefore blocks EMT.",
+      "CAF-derived HGF directly causes EMT without receptor involvement, so MET/c-MET is unnecessary.",
+      "MET mainly suppresses HGF as the dominant lung-cancer TME mechanism."
+    ],
+    "scope": "lung_cancer_tme_mechanism",
+    "evidence_strength": "review_supported_or_mechanistically_supported",
+    "note": "Use with source_registry and verification report; not intended as clinical advice."
+  },
+  {
+    "claim_id": "lc_tme_tam_m2_cd8_001",
+    "domain": "lung_cancer_tme",
+    "topic": "TAM_M2_CD8_IMMUNOSUPPRESSION",
+    "claim": "M2-like tumor-associated macrophages in lung cancer are commonly associated with immunosuppression, reduced antigen presentation, impaired effector T-cell responses, tumor progression, angiogenesis, metastasis, and therapy resistance.",
+    "required_nodes": [
+      "M2-like TAMs",
+      "immunosuppression",
+      "effector T cells/CD8+ T cells"
+    ],
+    "unacceptable_variants": [
+      "M2-like TAMs mainly activate cytotoxic CD8+ T cells and improve anti-tumor immunity in NSCLC.",
+      "M2-like TAMs are unrelated to immune evasion or therapy resistance in lung cancer.",
+      "High M2-like TAM activity should be treated as a simple marker of stronger anti-tumor immunity."
+    ],
+    "scope": "lung_cancer_tme_immunosuppression",
+    "evidence_strength": "review_supported_or_mechanistically_supported",
+    "note": "Use with source_registry and verification report; not intended as clinical advice."
+  },
+  {
+    "claim_id": "lc_tme_hypoxia_hif_pd_l1_001",
+    "domain": "lung_cancer_tme",
+    "topic": "HYPOXIA_HIF_IMMUNE_ESCAPE",
+    "claim": "Hypoxia and HIF signaling in tumors can contribute to immune escape, weakened cytotoxic T-cell function, recruitment of regulatory T cells, PD-L1-related mechanisms, angiogenesis, and aggressive lung cancer biology.",
+    "required_nodes": [
+      "hypoxia",
+      "HIF-1α/HIF signaling",
+      "immune escape",
+      "PD-L1 or T-cell dysfunction"
+    ],
+    "unacceptable_variants": [
+      "Hypoxia generally improves cytotoxic T-cell function and reduces immune escape in lung cancer.",
+      "HIF-1α has no plausible connection to PD-L1-related immune escape.",
+      "Tumor hypoxia blocks angiogenesis rather than promoting VEGF/angiogenic programs."
+    ],
+    "scope": "lung_cancer_tme_hypoxia",
+    "evidence_strength": "review_supported_or_mechanistically_supported",
+    "note": "Use with source_registry and verification report; not intended as clinical advice."
+  },
+  {
+    "claim_id": "lc_tme_mdsc_treg_cd8_001",
+    "domain": "lung_cancer_tme",
+    "topic": "MDSC_TREG_TCELL_SUPPRESSION",
+    "claim": "MDSCs and Tregs contribute to an immunosuppressive tumor microenvironment by limiting effector T-cell activity and supporting immune evasion; their crosstalk is relevant to checkpoint-resistance discussions.",
+    "required_nodes": [
+      "MDSCs",
+      "Tregs",
+      "effector T cells",
+      "immune evasion"
+    ],
+    "unacceptable_variants": [
+      "MDSCs primarily enhance antigen presentation and strengthen CD8+ T-cell killing in the tumor microenvironment.",
+      "Tregs in lung cancer mainly activate effector T cells rather than suppressing them.",
+      "MDSC-Treg crosstalk is irrelevant to immune checkpoint resistance."
+    ],
+    "scope": "lung_cancer_tme_immune_suppression",
+    "evidence_strength": "review_supported_or_mechanistically_supported",
+    "note": "Use with source_registry and verification report; not intended as clinical advice."
+  },
+  {
+    "claim_id": "lc_tme_caf_ecm_stiffness_001",
+    "domain": "lung_cancer_tme",
+    "topic": "CAF_ECM_STIFFNESS_BARRIER",
+    "claim": "CAF-associated extracellular matrix remodeling and stiffness can support tumor progression, invasion, drug delivery barriers, immune-cell exclusion, and therapy resistance; lung-cancer claims should preserve context and avoid universal statements.",
+    "required_nodes": [
+      "CAF",
+      "ECM remodeling/stiffness",
+      "invasion or drug delivery or immune infiltration"
+    ],
+    "unacceptable_variants": [
+      "ECM stiffness generally improves immune killer-cell infiltration and drug delivery in tumors.",
+      "CAF-associated ECM remodeling is always tumor-suppressive in lung cancer.",
+      "Collagen crosslinking and matrix stiffness have no plausible connection to cancer cell motility or treatment response."
+    ],
+    "scope": "lung_cancer_tme_ecm",
+    "evidence_strength": "review_supported_or_mechanistically_supported",
+    "note": "Use with source_registry and verification report; not intended as clinical advice."
+  },
+  {
+    "claim_id": "lc_tme_caf_heterogeneity_001",
+    "domain": "lung_cancer_tme",
+    "topic": "CAF_HETEROGENEITY_SCOPE",
+    "claim": "CAFs are heterogeneous in lung cancer and can have diverse, context-dependent roles in tumorigenesis, progression, angiogenesis, invasion, metastasis, therapy resistance, immune suppression, and treatment response.",
+    "required_nodes": [
+      "CAF heterogeneity",
+      "context dependence",
+      "lung cancer"
+    ],
+    "unacceptable_variants": [
+      "All CAFs have the same function in all lung tumors.",
+      "CAF evidence from pancreatic or breast cancer can be presented as proven NSCLC evidence without caveats.",
+      "CAFs are only tumor-suppressive and do not contribute to immune suppression or therapy resistance."
+    ],
+    "scope": "lung_cancer_tme_scope_transfer",
+    "evidence_strength": "review_supported_or_mechanistically_supported",
+    "note": "Use with source_registry and verification report; not intended as clinical advice."
+  }
+]

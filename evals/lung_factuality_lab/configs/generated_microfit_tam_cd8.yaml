@@ -1,0 +1,8 @@
+{
+  "batch_id": "lung_factuality_microfit_tam_cd8_v1",
+  "scenarios": [
+    "expert_tam_cd8_immunosuppression_001__gen_000",
+    "expert_tam_cd8_immunosuppression_001__gen_001",
+    "expert_tam_cd8_immunosuppression_001__gen_002"
+  ]
+}

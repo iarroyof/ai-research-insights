@@ -3,7 +3,29 @@ from __future__ import annotations
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
-import os, yaml
+import os, re, yaml
+
+
+def _expand_env(raw: str) -> str:
+    """
+    Expand shell-like environment placeholders in YAML.
+
+    os.path.expandvars does not understand ${VAR:-default}, which is useful in
+    docker-compose configs. Keep ${VAR} behavior compatible with expandvars.
+    """
+    pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}")
+
+    def repl(match: re.Match[str]) -> str:
+        name = match.group(1)
+        default = match.group(2)
+        value = os.environ.get(name)
+        if value is not None and value != "":
+            return value
+        if default is not None:
+            return default
+        return match.group(0)
+
+    return os.path.expandvars(pattern.sub(repl, raw))
 
 # --- Section models ---
 
@@ -51,10 +73,51 @@ class MinioCfg(BaseModel):
 class LLMCfg(BaseModel):
     base_url: str
     model: str
+    chat_provider: str = "local"  # local | nvidia
     max_input_tokens: int = 6000
     max_output_tokens: int = 512
     temperature: float = 0.2
     top_p: float = 1.0
+    context_manager_provider: str = "local"  # local | nvidia
+    context_manager_model: Optional[str] = None
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_api_key: Optional[str] = None
+    nvidia_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    nvidia_max_tokens: int = 2048
+    nvidia_reasoning_effort: Optional[str] = None
+    nvidia_enable_thinking: Optional[bool] = None
+
+class MemoryCfg(BaseModel):
+    enabled: bool = True
+    working_buffer_turns: int = 8
+    working_buffer_token_budget: int = 1800
+    memory_k: int = 8
+    triplet_k: int = 8
+    web_k: int = 3
+    token_budget_ratio: float = 0.45
+    episodic_summary_turns: int = 6
+    lifecycle_update_k: int = 80
+    eviction_importance_threshold: float = 0.25
+    allow_web_search_default: bool = False
+    use_llm_reflection: bool = False
+    shared_policy_enabled: bool = False
+    reward_trace_enabled: bool = True
+    auto_context_enabled: bool = True
+    auto_context_k: int = 8
+    auto_context_query_variants: int = 4
+    auto_context_llm_refine: bool = True
+    auto_context_llm_notes: bool = True
+    contradiction_threshold: float = 0.35
+    nli_enabled: bool = True
+    nli_provider: str = "hf_api"  # hf_api | http | llm | heuristic | local
+    nli_endpoint: Optional[str] = None
+    nli_model: str = "pritamdeka/PubMedBERT-MNLI-MedNLI"
+    hf_api_token: Optional[str] = None
+    hf_api_base_url: str = "https://router.huggingface.co/hf-inference/models"
+    hf_api_timeout_sec: int = 45
+    nli_hf_api_batch_size: int = 8
+    nli_min_entailment: float = 0.55
+    nli_contradiction_threshold: float = 0.45
 
 class RECfg(BaseModel):
     primary: str = "rebel"           # "rebel" | "openie6" | "corenlp"
@@ -114,6 +177,7 @@ class Settings(BaseSettings):
     neo4j: NeoCfg
     minio: MinioCfg
     llm: LLMCfg
+    memory: MemoryCfg = Field(default_factory=MemoryCfg)
     re: RECfg
     grobid: GrobidCfg
     pdf: PDFCfg
@@ -129,12 +193,11 @@ class Settings(BaseSettings):
         # 1) Read raw YAML
         with open(cfg_path, "r", encoding="utf-8") as f:
             raw = f.read()
-        # 2) Expand ${VAR} using container environment
-        raw = os.path.expandvars(raw)
+        # 2) Expand ${VAR} and ${VAR:-default} using container environment
+        raw = _expand_env(raw)
         # 3) Parse YAML and construct settings
         data = yaml.safe_load(raw)
         return cls(**data)
 
 # Single import point used by the whole app:
 settings = Settings.load()
-

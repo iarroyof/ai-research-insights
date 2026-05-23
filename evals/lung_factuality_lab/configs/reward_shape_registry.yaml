@@ -1,0 +1,384 @@
+# Reward shape registry for lung_factuality_lab.
+# Purpose: prevent iterative evaluation from revisiting known weaker reward/evaluator shapes.
+# A shape is accepted only when live endpoint results improve on the comparable prior live run.
+
+current_best_shape: shape4
+current_stage: shape7j_guarded_runtime_kept_evaluator_boundary_fix_pending
+selection_rule: >-
+  Prefer the highest live-endpoint average reward on comparable scenarios, with fewer
+  high-severity evaluator false positives and no regression in trap resistance. Replay-only
+  improvements are diagnostic, not sufficient for promotion.
+
+
+evaluation_ladder:
+  diagnostic_gate:
+    conversations: 1
+    purpose: Inspect one failing live trace before editing.
+  family_fit_gates:
+    correction_scope: evals/lung_factuality_lab/configs/generated_microfit_correction_scope.yaml
+    tam_cd8: evals/lung_factuality_lab/configs/generated_microfit_tam_cd8.yaml
+    citation_drift: evals/lung_factuality_lab/configs/generated_microfit_citation_drift.yaml
+  stratified_guard_gates:
+    sentinel_a: evals/lung_factuality_lab/configs/generated_sentinel_a.yaml
+    sentinel_b: evals/lung_factuality_lab/configs/generated_sentinel_b.yaml
+    sentinel_c: evals/lung_factuality_lab/configs/generated_sentinel_c.yaml
+  protected_holdout: evals/lung_factuality_lab/configs/generated_semantic_drift_holdout_v1.yaml
+  promotion_rule: >-
+    Replay isolates evaluator changes. Live family fit plus a stratified guard must improve
+    or remain stable before Stage 2 is rerun; Stage 3 remains protected until confidence is high.
+
+shape_experiment_template:
+  required_fields:
+    - hypothesis
+    - target_failure_family
+    - fit_conversations
+    - guard_conversations
+    - holdout_conversations
+    - replay_metrics
+    - live_metrics
+    - family_deltas
+    - failure_category_deltas
+    - promotion_decision
+    - blocked_reason
+
+shapes:
+  shape0_baseline:
+    status: superseded
+    description: Original Stage 1 live evaluator/reward shape before rejection/caveat fixes.
+    completed_runs:
+      - path: evals/lung_factuality_lab/runs/stage1_endpoint_actual
+        mode: live_stage1
+        conversations: 8
+        turns: 56
+        avg_reward: 0.1377
+        failure_count: 181
+        notes: Severe scope_drift and factual_inversion over-penalization.
+    do_not_revisit_reason: Superseded by shape4 Stage 1 live improvement.
+
+  shape1:
+    status: rejected_replay_only
+    description: Added saved-answer replay, empty-answer penalty, false-premise rejection handling, focus ordering, and per-type penalty caps.
+    completed_runs:
+      - path: evals/lung_factuality_lab/runs/shape1_replay_expert_hgf
+        mode: replay_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.3265
+        failure_count: 10
+    do_not_revisit_reason: Intermediate replay-only shape; superseded by shape2/shape4.
+
+  shape2:
+    status: rejected_live_regression
+    description: Tightened caveat handling, off-topic scope terms, and short question extraction.
+    completed_runs:
+      - path: evals/lung_factuality_lab/runs/shape2_replay_expert_hgf
+        mode: replay_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.5705
+        failure_count: 5
+      - path: evals/lung_factuality_lab/runs/shape2_live_expert_hgf
+        mode: live_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.1000
+        failure_count: 20
+    do_not_revisit_reason: Replay improved, but fresh live endpoint HGF regressed below baseline.
+
+  shape3:
+    status: rejected_live_underperforming
+    description: Added direction-aware partial support and narrower HGF/MET inversion detection.
+    completed_runs:
+      - path: evals/lung_factuality_lab/runs/shape3_replay_shape2_live_expert_hgf
+        mode: replay_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.3505
+        failure_count: 17
+      - path: evals/lung_factuality_lab/runs/shape3_live_expert_hgf
+        mode: live_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.1834
+        failure_count: 15
+    do_not_revisit_reason: Improved over shape2 fresh live but remained below original HGF baseline and below shape4.
+
+  shape4:
+    status: accepted_current_best
+    description: Added rejected-phrasing and clarification-question handling; promoted after live HGF and TAM/CD8 improvements.
+    completed_runs:
+      - path: evals/lung_factuality_lab/runs/shape4_replay_shape3_live_expert_hgf
+        mode: replay_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.4787
+        failure_count: 10
+      - path: evals/lung_factuality_lab/runs/shape4_live_expert_hgf
+        mode: live_single_hgf
+        conversations: 1
+        turns: 7
+        avg_reward: 0.4355
+        failure_count: 8
+      - path: evals/lung_factuality_lab/runs/shape4_live_expert_tam_cd8
+        mode: live_single_tam_cd8
+        conversations: 1
+        turns: 7
+        avg_reward: 0.4996
+        failure_count: 10
+      - path: evals/lung_factuality_lab/runs/shape4_stage1_live
+        mode: live_stage1
+        conversations: 8
+        turns: 56
+        avg_reward: 0.3797
+        failure_count: 129
+    promotion_evidence:
+      - HGF live avg_reward improved from 0.2129 baseline to 0.4355.
+      - TAM/CD8 live avg_reward improved from 0.2341 baseline to 0.4996.
+      - Stage 1 live avg_reward improved from 0.1377 baseline to 0.3797.
+      - Stage 1 failure_count decreased from 181 to 129.
+      - path: evals/lung_factuality_lab/runs/shape4_stage2_live
+        mode: live_stage2
+        conversations: 24
+        turns: 168
+        avg_reward: 0.3374
+        failure_count: 379
+        notes: Completed validation; lower average reward than Stage 1 across broader variants. Diagnose Stage 2 failures before Stage 3.
+    validation_notes:
+      - Stage 2 variant-0 overlap improved for citation drift only; seven other Stage 1 overlap families were flat or lower.
+      - Do not treat Stage 2 as maximum-confidence promotion for full Stage 3 yet.
+
+  shape5_scope_microfit:
+    status: candidate_running
+    hypothesis: >-
+      Correction-scope scores improve when generated scope traps classify FDA/pricing acceptance
+      as scope drift, rejected CAF overgeneralizations are treated as rejected premises, and
+      observability turns are not scored as unsupported biomedical claims.
+    target_failure_family: correction_scope_tme_only
+    fit_conversations:
+      - evals/lung_factuality_lab/configs/generated_microfit_correction_scope.yaml
+    guard_conversations:
+      - evals/lung_factuality_lab/configs/generated_sentinel_a.yaml
+    holdout_conversations:
+      - evals/lung_factuality_lab/configs/generated_semantic_drift_holdout_v1.yaml
+    replay_metrics:
+      - path: evals/lung_factuality_lab/runs/shape5_replay_microfit_correction_scope
+        mode: saved_stage2_answer_replay_family_fit
+        conversations: 3
+        turns: 21
+        avg_reward: 0.3980
+        failure_count: 56
+        baseline_shape4_saved_live_avg_reward: 0.2477
+        baseline_shape4_saved_live_failure_count: 67
+      - path: evals/lung_factuality_lab/runs/shape5_replay_microfit_tam_cd8
+        mode: saved_stage2_answer_replay_adjacent_family_check
+        conversations: 3
+        turns: 21
+        avg_reward: 0.4129
+        failure_count: 41
+        baseline_shape4_saved_live_avg_reward: 0.3611
+        baseline_shape4_saved_live_failure_count: 44
+    live_metrics:
+      - path: evals/lung_factuality_lab/runs/shape5_live_microfit_correction_scope
+        mode: live_family_fit
+        conversations: 3
+        turns: 21
+        avg_reward: 0.2834
+        failure_count: 54
+        baseline_shape4_live_avg_reward: 0.2477
+        baseline_shape4_live_failure_count: 67
+        decision: cleared_live_family_fit
+      - path: evals/lung_factuality_lab/runs/shape5_live_sentinel_a
+        mode: live_stratified_guard
+        conversations: 8
+        turns: 56
+        avg_reward: 0.3838
+        failure_count: 113
+        notes: Guard used held variant mix gen003-gen005; HGF gen004 remains a weak trace to inspect before broader promotion.
+      - path: evals/lung_factuality_lab/runs/shape5_live_microfit_tam_cd8
+        mode: live_family_fit
+        conversations: 3
+        turns: 21
+        avg_reward: 0.5886
+        failure_count: 26
+        baseline_shape4_live_avg_reward: 0.3611
+        baseline_shape4_live_failure_count: 44
+        decision: cleared_live_family_fit_and_started_sentinel_b
+      - path: evals/lung_factuality_lab/runs/shape5_live_sentinel_b
+        mode: live_stratified_guard
+        conversations: 8
+        turns: 56
+        avg_reward: 0.3935
+        failure_count: 103
+        notes: Guard cleared sentinel_a and Shape4 Stage 1 averages; citation drift and MDSC/Treg remain the weakest guard traces.
+    diagnostic_replays:
+      - path: evals/lung_factuality_lab/runs/shape5_replay_hgf_sentinel_quote_fix
+        mode: saved_live_hgf_rejected_quote_check
+        avg_reward: 0.2460
+        failure_count: 22
+        baseline_live_hgf_sentinel_avg_reward: 0.1176
+        baseline_live_hgf_sentinel_failure_count: 23
+      - path: evals/lung_factuality_lab/runs/shape5_replay_hgf_sentinel_caveat_fix
+        mode: saved_live_hgf_caveat_check
+        avg_reward: 0.3153
+        failure_count: 21
+        baseline_live_hgf_sentinel_avg_reward: 0.1176
+        baseline_live_hgf_sentinel_failure_count: 23
+        notes: Rejected quoted HGF shortcut and explicit context-does-not caveat false positives reduced; one real empty-answer failure remains.
+    promotion_decision: sentinel_b_live_guard_cleared_reviewed_shape6_citation_scope_diagnostic_started
+
+  shape6_citation_scope_microfit:
+    status: candidate_running
+    hypothesis: >-
+      Citation-scope evidence-transfer guidance should not be penalized as unsupported
+      biomedical mechanism prose or forced through mechanism-graph completeness when it
+      explicitly distinguishes general-oncology evidence from lung-cancer-specific proof.
+    target_failure_family: citation_drift_lung_vs_general_oncology
+    fit_conversations:
+      - evals/lung_factuality_lab/configs/generated_microfit_citation_drift.yaml
+    guard_conversations:
+      - evals/lung_factuality_lab/configs/generated_sentinel_c.yaml
+    holdout_conversations:
+      - evals/lung_factuality_lab/configs/generated_semantic_drift_holdout_v1.yaml
+    replay_metrics:
+      - path: evals/lung_factuality_lab/runs/shape6_replay_citation_drift_sentinel_b
+        mode: saved_live_citation_drift_diagnostic
+        conversations: 1
+        turns: 7
+        avg_reward: 0.3739
+        failure_count: 12
+        baseline_shape5_live_sentinel_b_avg_reward: 0.2190
+        baseline_shape5_live_sentinel_b_failure_count: 18
+        decision: cleared_saved_answer_replay_gate
+      - path: evals/lung_factuality_lab/runs/shape6_replay_microfit_citation_drift
+        mode: saved_stage2_answer_replay_family_fit
+        conversations: 3
+        turns: 21
+        avg_reward: 0.4874
+        failure_count: 47
+        baseline_shape4_stage2_subset_avg_reward: 0.3688
+        baseline_shape4_stage2_subset_failure_count: 56
+        decision: cleared_saved_answer_replay_family_fit
+    live_metrics:
+      - path: evals/lung_factuality_lab/runs/shape6_live_citation_drift_gen005
+        mode: live_single_citation_drift_diagnostic
+        conversations: 1
+        turns: 7
+        avg_reward: 0.5011
+        failure_count: 10
+        baseline_shape5_live_sentinel_b_avg_reward: 0.2190
+        baseline_shape5_live_sentinel_b_failure_count: 18
+        decision: cleared_live_single_diagnostic
+      - path: evals/lung_factuality_lab/runs/shape6_live_microfit_citation_drift
+        mode: live_family_fit
+        conversations: 3
+        turns: 21
+        avg_reward: 0.3978
+        failure_count: 50
+        baseline_shape4_stage2_subset_avg_reward: 0.3688
+        baseline_shape4_stage2_subset_failure_count: 56
+        decision: cleared_live_family_fit_and_started_sentinel_c
+      - path: evals/lung_factuality_lab/runs/shape6_live_sentinel_c
+        mode: live_stratified_guard
+        conversations: 8
+        turns: 56
+        avg_reward: 0.4337
+        failure_count: 119
+        decision: cleared_live_guard
+    promotion_decision: sentinel_c_live_guard_cleared_review_shape7_evidence_assembly_candidate_before_stage2_rerun
+
+  shape7_evidence_assembly_microfit:
+    status: candidate_family_fit
+    hypothesis: >-
+      Ambiguous biomedical synthesis improves when the context manager searches
+      candidate evidence frames, scores missing evidence-puzzle edges, streams a
+      plain textual opening clarification, and the evaluator treats explicit
+      missing-link boundaries as evidence-safe rather than fabricated mechanisms.
+    target_failure_family: biomedical_ambiguous_evidence_assembly
+    fit_conversations:
+      - evals/lung_factuality_lab/configs/evidence_assembly_microfit.yaml
+    guard_conversations:
+      - evals/lung_factuality_lab/configs/generated_sentinel_c.yaml
+    holdout_conversations:
+      - evals/lung_factuality_lab/configs/generated_semantic_drift_holdout_v1.yaml
+    replay_metrics:
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_replay_shape7b
+        mode: saved_live_evidence_assembly_replay_family_fit
+        conversations: 1
+        turns: 2
+        avg_reward: 0.5048
+        failure_count: 4
+        baseline_shape7_live_avg_reward: 0.3891
+        baseline_shape7_live_failure_count: 6
+        decision: cleared_saved_answer_replay_gate
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_replay_shape7j_boundary_fix
+        mode: saved_live_evidence_assembly_replay_after_boundary_constraint_fix
+        conversations: 2
+        turns: 5
+        avg_reward: 1.0
+        failure_count: 0
+        baseline_shape7j_live_avg_reward: 0.8987
+        baseline_shape7j_live_failure_count: 1
+        decision: cleared_saved_answer_replay_gate_for_guarded_runtime
+    live_metrics:
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_microfit_shape7
+        mode: live_family_fit_initial
+        conversations: 1
+        turns: 2
+        avg_reward: 0.3891
+        failure_count: 6
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_microfit_shape7b
+        mode: live_family_fit_after_boundary_shaping
+        conversations: 1
+        turns: 2
+        avg_reward: 0.5758
+        failure_count: 3
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_microfit_shape7c
+        mode: live_family_fit_code_matched_final
+        conversations: 1
+        turns: 2
+        avg_reward: 0.5666
+        failure_count: 5
+        decision: family_fit_improved_guard_pending
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_microfit_shape7d
+        mode: live_family_fit_with_cross_domain_seed
+        conversations: 2
+        turns: 5
+        avg_reward: 0.9017
+        failure_count: 1
+        notes: Added cross-domain fungal analogy/follow-up seed; fungal seed cleared, ambiguous seed retained one unsupported missing-example failure.
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_single_shape7i
+        mode: live_single_ambiguous_after_followup_puzzle_fix
+        conversations: 1
+        turns: 2
+        avg_reward: 1.0
+        failure_count: 0
+        notes: Single run cleared after prior-frame evidence-puzzle carryover; not sufficient for promotion.
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_microfit_shape7j
+        mode: live_family_fit_with_generation_hold_guard
+        conversations: 2
+        turns: 5
+        avg_reward: 0.8987
+        failure_count: 1
+        notes: Guarded generation fixed the fungal follow-up seed again and suppressed unsupported elaboration on sparse evidence. The raw average remained slightly below shape7d because the evaluator marked a meta-boundary sentence about snippet constraints as unsupported.
+      - path: evals/lung_factuality_lab/runs/evidence_assembly_live_microfit_shape7j_boundary_fix/biomedical_ambiguous_evidence_assembly_001
+        mode: live_partial_single_after_boundary_constraint_fix
+        conversations: 1
+        turns: 2
+        avg_reward: 1.0
+        failure_count: 0
+        notes: Fresh live endpoint rerun cleared the ambiguous sparse-evidence scenario; the full two-scenario rerun through a one-off container was stopped after hanging on the second scenario, leaving no active experiment.
+    promotion_decision: keep_shape7j_guarded_runtime_candidate_only_until_boundary_evaluator_fix_and_stratified_guard_clear
+
+blocked_shapes:
+  - shape0_baseline
+  - shape1
+  - shape2
+  - shape3
+
+next_allowed_actions:
+  - Fix the evidence-assembly evaluator so meta-boundary and snippet-constraint statements are safe evidence-limitation claims, then rerun Shape7j saved-answer replay and the two-scenario live microfit.
+  - Run a stratified live guard for the Shape7j evidence-assembly runtime/search changes only after the boundary evaluator fix clears the microfit.
+  - Use the Shape5 sentinel_b guard and HGF diagnostic replay evidence before any broader Stage 2 rerun.
+  - Keep shape4 as current-best until the TAM/CD8 follow-up guard evidence is reviewed.
+  - If a new guard regresses, diagnose that run and create a new candidate without revisiting shape1, shape2, or shape3.
+  - Start Stage 3 only after Stage 2 diagnosis and higher-confidence live validation are sufficient.

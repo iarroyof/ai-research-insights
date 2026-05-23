@@ -1,0 +1,37 @@
+{
+  "graphs": [
+    {
+      "graph_id": "lc_caf_hgf_met_emt_chain",
+      "topic": "CAF_HGF_MET_EMT",
+      "required_nodes": ["CAF", "HGF", "MET/c-MET", "downstream signaling", "EMT"],
+      "preferred_edges": [
+        {"source": "CAF", "relation": "secretes_or_produces", "target": "HGF"},
+        {"source": "HGF", "relation": "activates", "target": "MET/c-MET"},
+        {"source": "MET/c-MET", "relation": "contributes_to", "target": "downstream signaling"},
+        {"source": "downstream signaling", "relation": "contributes_to", "target": "EMT"}
+      ],
+      "common_errors": ["missing_MET_node", "reversed_HGF_MET_direction", "overclaiming_direct_causality", "treating_all_CAFs_as_identical"]
+    },
+    {
+      "graph_id": "lc_tam_cd8_suppression_chain",
+      "topic": "TAM_CD8_IMMUNOSUPPRESSION",
+      "required_nodes": ["TAM", "M2-like polarization", "immunosuppression", "CD8 T cells"],
+      "preferred_edges": [
+        {"source": "M2-like TAM", "relation": "contributes_to", "target": "immunosuppression"},
+        {"source": "immunosuppression", "relation": "reduces", "target": "CD8 T-cell anti-tumor activity"}
+      ],
+      "common_errors": ["reversed_tam_cd8_direction", "overgeneralizing_macrophage_roles"]
+    },
+    {
+      "graph_id": "lc_hypoxia_hif_immune_escape_chain",
+      "topic": "HYPOXIA_IMMUNE_ESCAPE",
+      "required_nodes": ["hypoxia", "HIF", "angiogenesis", "immune escape"],
+      "preferred_edges": [
+        {"source": "hypoxia", "relation": "activates", "target": "HIF-linked programs"},
+        {"source": "HIF-linked programs", "relation": "contributes_to", "target": "angiogenesis"},
+        {"source": "hypoxia", "relation": "contributes_to", "target": "immune escape"}
+      ],
+      "common_errors": ["missing_HIF_node", "claiming_hypoxia_restores_immunity"]
+    }
+  ]
+}

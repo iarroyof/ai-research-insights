@@ -19,10 +19,23 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     """
 
     # Public endpoints that don't require authentication
-    PUBLIC_PATHS = [
+    PUBLIC_PATHS = {
+        "/",
         "/health",
+        "/favicon.ico",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+    }
+    PUBLIC_PREFIXES = (
         "/triplets/graph/view",
-    ]
+    )
+
+    @classmethod
+    def _is_public_path(cls, path: str) -> bool:
+        return path in cls.PUBLIC_PATHS or any(
+            path.startswith(prefix) for prefix in cls.PUBLIC_PREFIXES
+        )
 
     async def dispatch(
         self,
@@ -32,8 +45,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         cfg = settings.security
 
-        # 🔓 Public endpoints: no API key required
-        if path == "/health" or path.startswith("/triplets/graph/view"):
+        # Public endpoints: no API key required
+        if self._is_public_path(path):
             request.state.api_key_valid = True  # Mark as valid for downstream
             return await call_next(request)
 
@@ -60,4 +73,3 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         # Expose auth status to downstream handlers
         request.state.api_key_valid = True
         return await call_next(request)
-

@@ -1,9 +1,10 @@
 services:
   caddy:
     image: caddy:2
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     ports:
-      - "8080:8080"
-      - "8443:8443"
+      - "${CADDY_HTTP_PORT:-8080}:8080"
+      - "${CADDY_HTTPS_PORT:-8443}:8443"
     volumes:
       - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -15,10 +16,12 @@ services:
   api:
     build:
       context: .
-      dockerfile: services/api/Dockerfile
+      dockerfile: ${API_DOCKERFILE:-services/api/Dockerfile.hosted}
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
     environment:
       - APP_CONFIG=/app/config/default.yaml
+      - PYTHONPATH=/app
       - API_URL=http://api:8080
       - API_KEY=${API_KEY}
 
@@ -31,7 +34,32 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://llm:8000/v1}
       - LLM_MODEL_ID=${LLM_MODEL_ID}
+      - LLM_CHAT_PROVIDER=${LLM_CHAT_PROVIDER:-nvidia}
+      - CONTEXT_MANAGER_PROVIDER=${CONTEXT_MANAGER_PROVIDER:-nvidia}
+      - CONTEXT_MANAGER_MODEL=${CONTEXT_MANAGER_MODEL:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/llama-3.3-nemotron-super-49b-v1.5}
+      - NVIDIA_MAX_TOKENS=${NVIDIA_MAX_TOKENS:-2048}
+      - NVIDIA_REASONING_EFFORT=${NVIDIA_REASONING_EFFORT:-}
+      - NLI_PROVIDER=${NLI_PROVIDER:-hf_api}
+      - NLI_MODEL=${NLI_MODEL:-pritamdeka/PubMedBERT-MNLI-MedNLI}
+      - NLI_ENDPOINT=${NLI_ENDPOINT:-}
+      - HF_API_TOKEN=${HF_API_TOKEN:-}
+      - HF_API_BASE_URL=${HF_API_BASE_URL:-https://router.huggingface.co/hf-inference/models}
+      - HF_API_TIMEOUT_SEC=${HF_API_TIMEOUT_SEC:-45}
+      - NLI_HF_API_MAX_RETRIES=${NLI_HF_API_MAX_RETRIES:-2}
+      - NLI_HF_API_RETRY_BACKOFF_SEC=${NLI_HF_API_RETRY_BACKOFF_SEC:-2.0}
+      - NLI_MIN_ENTAILMENT=${NLI_MIN_ENTAILMENT:-0.55}
+      - NLI_CONTRADICTION_THRESHOLD=${NLI_CONTRADICTION_THRESHOLD:-0.45}
+      - ZERO_SHOT_PROVIDER=${ZERO_SHOT_PROVIDER:-hf_api}
+      - ZERO_SHOT_MODEL=${ZERO_SHOT_MODEL:-facebook/bart-large-mnli}
+      - ZERO_SHOT_HF_API_BASE_URL=${ZERO_SHOT_HF_API_BASE_URL:-https://router.huggingface.co/hf-inference/models}
+      - ZERO_SHOT_HF_API_TIMEOUT_SEC=${ZERO_SHOT_HF_API_TIMEOUT_SEC:-45}
+      - ZERO_SHOT_HF_API_MAX_RETRIES=${ZERO_SHOT_HF_API_MAX_RETRIES:-2}
+      - ZERO_SHOT_HF_API_RETRY_BACKOFF_SEC=${ZERO_SHOT_HF_API_RETRY_BACKOFF_SEC:-2.0}
 
     volumes:
       - ./services/api:/app
@@ -43,12 +71,9 @@ services:
       - neo4j
       - minio
       - grobid
-      - llm
-      - models-init
-      - rebel-extractor
       - corenlp-adapter
     ports:
-      - "18081:8080"
+      - "${API_HOST_PORT:-18081}:8080"
     networks:
       - ai_research_insights_net
 
@@ -56,9 +81,13 @@ services:
     build:
       context: .
       dockerfile: services/worker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: ${WORKER_REQUIREMENTS_FILE:-services/api/requirements.hosted.txt}
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     command: ["python", "services/worker/worker.py", "cpu"]
     environment:
       - APP_CONFIG=/app/config/default.yaml
+      - PYTHONPATH=/app
     volumes:
       - ./services/api:/app
       - ./services/worker:/app/services/worker
@@ -68,13 +97,17 @@ services:
       - ai_research_insights_net
 
   worker-gpu:
+    profiles: ["gpu"]
     build:
       context: .
       dockerfile: services/worker/Dockerfile
-    runtime: nvidia
+      args:
+        REQUIREMENTS_FILE: ${WORKER_GPU_REQUIREMENTS_FILE:-services/api/requirements.txt}
+    runtime: ${DOCKER_GPU_RUNTIME:-nvidia}
     command: ["python", "services/worker/worker.py", "gpu"]
     environment:
       - APP_CONFIG=/app/config/default.yaml
+      - PYTHONPATH=/app
       - CUDA_VISIBLE_DEVICES=0
     volumes:
       - ./services/api:/app
@@ -87,11 +120,13 @@ services:
   # Infra
   redis:
     image: redis:7-alpine
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     networks:
       - ai_research_insights_net
 
   postgres:
     image: postgres:16
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
@@ -103,6 +138,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.13.0
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     environment:
       - discovery.type=single-node
       - plugins.security.disabled=true
@@ -116,10 +152,11 @@ services:
     networks:
       - ai_research_insights_net
     ports:
-      - "19200:9200"
+      - "${OPENSEARCH_HOST_PORT:-19200}:9200"
 
   neo4j:
     image: neo4j:5.23.0-community
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     environment:
       - NEO4J_AUTH=neo4j/neo4j_pass
       # Optional: increase memory for better performance
@@ -129,13 +166,14 @@ services:
     volumes:
       - neo4jdata:/data
     ports:
-      - "7474:7474"  # HTTP (Browser UI)
-      - "7687:7687"  # Bolt protocol (API access)
+      - "${NEO4J_HTTP_PORT:-7474}:7474"  # HTTP (Browser UI)
+      - "${NEO4J_BOLT_PORT:-7687}:7687"  # Bolt protocol (API access)
     networks:
       - ai_research_insights_net
 
   minio:
     image: minio/minio
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=minio
@@ -147,14 +185,16 @@ services:
 
   grobid:
     image: lfoppiano/grobid:0.7.3
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     environment:
       - GROBID_WORKERS=4
     networks:
       - ai_research_insights_net
 
   llm:
+    profiles: ["gpu"]
     image: vllm/vllm-openai:latest
-    runtime: nvidia
+    runtime: ${DOCKER_GPU_RUNTIME:-nvidia}
     command: ["--model", "HuggingFaceH4/zephyr-7b-beta", "--gpu-memory-utilization", "0.85"]
     environment:
       - HF_HOME=/models
@@ -164,9 +204,11 @@ services:
       - ai_research_insights_net
 
   models-init:
+    profiles: ["gpu"]
     build:
       context: .
       dockerfile: services/models-init/Dockerfile
+    runtime: ${DOCKER_GPU_RUNTIME:-nvidia}
     environment:
       - HF_HOME=/models
       - LLM_MODEL_ID=${LLM_MODEL_ID:-HuggingFaceH4/zephyr-7b-beta}
@@ -177,10 +219,11 @@ services:
 
   # --- REBEL extractor (main) ---
   rebel-extractor:
+    profiles: ["gpu"]
     build:
       context: .
       dockerfile: services/rebel-extractor/Dockerfile
-    runtime: nvidia
+    runtime: ${DOCKER_GPU_RUNTIME:-nvidia}
     environment:
       HF_HOME: /models
       REBEL_MODEL_ID: Babelscape/rebel-large
@@ -203,6 +246,7 @@ services:
   # --- Stanford CoreNLP + adapter (fallback) ---
   corenlp:
     image: nlpbox/corenlp:latest
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     command:
       - sh
       - -lc
@@ -221,6 +265,7 @@ services:
     build:
       context: .
       dockerfile: services/corenlp-adapter/Dockerfile
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     environment:
       - CORENLP_URL=http://corenlp:9000
     depends_on: [corenlp]
@@ -232,6 +277,7 @@ services:
     build:
       context: .
       dockerfile: services/streamlit/Dockerfile
+    runtime: ${DOCKER_CPU_RUNTIME:-runc}
     environment:
       - APP_CONFIG=/app/config/default.yaml
       - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8080}

@@ -1,0 +1,23 @@
+{
+  "reward_components": {
+    "factual_support": {"weight": 0.30},
+    "contradiction_avoidance": {"weight": 0.20},
+    "mechanistic_completeness": {"weight": 0.15},
+    "scope_alignment": {"weight": 0.10},
+    "correction_adherence": {"weight": 0.10},
+    "uncertainty_calibration": {"weight": 0.10},
+    "citation_or_evidence_quality": {"weight": 0.05}
+  },
+  "penalties": {
+    "dangerous_biomedical_falsehood": 0.70,
+    "factual_inversion": 0.55,
+    "mechanistic_contradiction": 0.45,
+    "unsupported_plausible_mechanism": 0.35,
+    "cross_domain_transfer": 0.55,
+    "mechanistic_chain_break": 0.40,
+    "scope_drift": 0.25,
+    "vague_supported_answer": 0.10,
+    "overgeneralization": 0.20,
+    "empty_answer": 0.60
+  }
+}

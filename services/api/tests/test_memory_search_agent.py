@@ -1,0 +1,472 @@
+import unittest
+
+from app.config import settings
+from app.memory.search_agent import (
+    _fallback_queries_from_text,
+    _feedback_term_report,
+    _feedback_terms_from_results,
+    _is_off_topic_hit,
+    build_auto_context,
+    deterministic_query_variants,
+    _domain_search_frame,
+    _evidence_assembly,
+    plan_auto_context,
+    search_state_key,
+)
+
+
+class FakeStore:
+    async def search_policy_notes(self, **kwargs):
+        return [{"note": "Broaden short biomedical questions with synonyms and alternate disease names."}]
+
+    async def action_values(self, **kwargs):
+        return []
+
+
+async def fake_search(tenant, query, filters, k):
+    base = [
+        {
+            "paper_id": "paper-1",
+            "sent_id": "s1",
+            "text": "PD-L1 expression is associated with checkpoint inhibitor response in NSCLC.",
+            "score": 3.0,
+        },
+        {
+            "paper_id": "paper-1",
+            "sent_id": "s1",
+            "text": "PD-L1 expression is associated with checkpoint inhibitor response in NSCLC.",
+            "score": 2.5,
+        },
+        {
+            "paper_id": "paper-2",
+            "sent_id": "s2",
+            "text": "Non-small cell lung cancer trials often report immune checkpoint outcomes.",
+            "score": 2.0,
+        },
+    ]
+    return base[:k]
+
+
+class FakeMultilevelSearch:
+    def __init__(self):
+        self.calls = []
+
+    async def __call__(self, tenant, level, query, filters, k):
+        self.calls.append({"level": level, "query": query, "filters": filters, "k": k})
+        if level == "title":
+            return [
+                {
+                    "paper_id": "paper-title",
+                    "sent_id": "title",
+                    "title": "Nivolumab and PD-L1 biomarkers in NSCLC",
+                    "text": "Nivolumab and PD-L1 biomarkers in NSCLC",
+                    "score": 5.0,
+                    "search_level": "title",
+                }
+            ][:k]
+        if level == "paper":
+            return [
+                {
+                    "paper_id": "paper-paper",
+                    "sent_id": "abstract",
+                    "title": "Immune checkpoint treatment",
+                    "text": "This paper reviews nivolumab, pembrolizumab, PD-L1, and NSCLC response biomarkers.",
+                    "score": 4.0,
+                    "search_level": "paper",
+                }
+            ][:k]
+        return [
+            {
+                "paper_id": "paper-sentence",
+                "sent_id": "s1",
+                "title": "PD-L1 response evidence",
+                "text": "PD-L1 expression is associated with checkpoint inhibitor response in NSCLC.",
+                "score": 3.0,
+                "search_level": "sentence",
+            },
+            {
+                "paper_id": "paper-sentence",
+                "sent_id": "s1",
+                "title": "PD-L1 response evidence",
+                "text": "PD-L1 expression is associated with checkpoint inhibitor response in NSCLC.",
+                "score": 2.5,
+                "search_level": "sentence",
+            },
+        ][:k]
+
+
+class FakeNoisyMultilevelSearch:
+    def __init__(self):
+        self.calls = []
+
+    async def __call__(self, tenant, level, query, filters, k):
+        self.calls.append({"level": level, "query": query, "filters": filters, "k": k})
+        if level == "title":
+            return [
+                {
+                    "paper_id": "paper-survey",
+                    "sent_id": "title",
+                    "title": "Administered questionnaire formats and radio button free text questions",
+                    "text": "Four different questionnaire formats used radio buttons and free text.",
+                    "score": 1.0,
+                    "search_level": "title",
+                }
+            ][:k]
+        if level == "paper":
+            return [
+                {
+                    "paper_id": "paper-metabolism",
+                    "sent_id": "abstract",
+                    "title": "Dietary metabolism and local tissue acidity",
+                    "text": "Dietary metabolic exposures and lactate can affect local tissue environments.",
+                    "score": 3.0,
+                    "search_level": "paper",
+                }
+            ][:k]
+        return [
+            {
+                "paper_id": "paper-lactate",
+                "sent_id": "s1",
+                "title": "Lactate and acidic tissue environments",
+                "text": "Lactate accumulation can lower extracellular pH in metabolically active tissue.",
+                "score": 4.0,
+                "search_level": "sentence",
+            }
+        ][:k]
+
+
+class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
+    def test_state_key_buckets_do_not_embed_query_terms(self):
+        key = search_state_key("Does PD-L1 predict response in non-small cell lung cancer?")
+
+        self.assertIn("search:v1", key)
+        self.assertIn("intent:question", key)
+        self.assertNotIn("pd", key.lower())
+        self.assertNotIn("lung", key.lower())
+        self.assertNotIn("cancer", key.lower())
+
+    def test_deterministic_variants_include_normalized_biomedical_terms(self):
+        variants = deterministic_query_variants(
+            "Does PD-L1 predict response in non-small cell lung cancer?",
+            strategy="wide",
+            max_variants=5,
+        )
+        joined = " ".join(item.query.lower() for item in variants)
+
+        self.assertGreaterEqual(len(variants), 3)
+        self.assertIn("pdl1", joined)
+        self.assertIn("nsclc", joined)
+
+    def test_domain_bridge_maps_functional_synergy_to_mechanistic_tme_terms(self):
+        frame = _domain_search_frame("What is the functional synergy that defines aggressive lung carcinoma?")
+        variants = deterministic_query_variants(
+            "What is the functional synergy that defines aggressive lung carcinoma?",
+            strategy="medium",
+            max_variants=4,
+            search_frame=frame,
+        )
+        joined = " ".join(item.query.lower() for item in variants)
+
+        self.assertEqual(frame["frame"], "mechanistic_tme_synergy")
+        self.assertIn("mechanistic synergy", joined)
+        self.assertIn("crosstalk", joined)
+        self.assertIn("combination index", frame["avoid_terms"])
+
+    def test_current_query_prevents_stale_tme_note_from_forcing_fungal_analogy_frame(self):
+        frame = _domain_search_frame(
+            "What experimental approaches treat cancer as a fungal infection?",
+            notes=[{"note": "Use TME tumor microenvironment growth bridge terms for the prior lung cancer turn."}],
+        )
+
+        self.assertEqual(frame["frame"], "general_biomedical")
+        self.assertEqual(frame["preferred_queries"], [])
+
+    def test_feedback_terms_filter_caption_noise_and_keep_domain_terms(self):
+        terms = _feedback_terms_from_results(
+            [
+                {
+                    "title": "The figure shows that immune cells in TME regulate tumor growth.",
+                    "text": "CAF macrophage hypoxia angiogenesis cytokine crosstalk promotes invasion.",
+                }
+            ],
+            limit=8,
+        )
+
+        self.assertNotIn("figure", terms)
+        self.assertNotIn("show", terms)
+        self.assertIn("hypoxia", terms)
+
+    def test_feedback_terms_filter_instrument_noise_inside_partly_relevant_hit(self):
+        terms = _feedback_terms_from_results(
+            [
+                {
+                    "title": "Food habits questionnaire with free text question formats",
+                    "text": "Four text questions and one test guarantee response collection.",
+                }
+            ],
+            limit=8,
+        )
+
+        self.assertNotIn("questionnaire", terms)
+        self.assertNotIn("ques", terms)
+        self.assertNotIn("test", terms)
+        self.assertNotIn("four", terms)
+
+    def test_feedback_terms_filter_dialogue_and_correspondence_metadata(self):
+        terms = _feedback_terms_from_results(
+            [
+                {
+                    "title": "Physician 9 noted treatment risk and benefit between patients",
+                    "text": "Correspondence Jane dos Santos jlsantos uesc brthi patient talk.",
+                }
+            ],
+            limit=8,
+        )
+
+        self.assertNotIn("physician", terms)
+        self.assertNotIn("noted", terms)
+        self.assertNotIn("correspondence", terms)
+        self.assertNotIn("jane", terms)
+        self.assertNotIn("jlsanto", terms)
+
+    def test_cross_domain_analogy_rejects_case_treatment_feedback_without_target_domain(self):
+        report = _feedback_term_report(
+            [
+                {
+                    "title": "Pulmonary cryptococcosis diagnosed after treatment",
+                    "text": "The patient received fluconazole antifungal therapy after diagnosis.",
+                }
+            ],
+            anchor_queries=["cancer therapy inspired by antifungal strategy"],
+            limit=8,
+        )
+
+        self.assertEqual(report["accepted_terms"], [])
+        self.assertGreater(report["rejected_result_count"], 0)
+
+    def test_off_topic_synergy_hit_is_skipped_for_mechanistic_frame(self):
+        frame = _domain_search_frame("functional synergy aggressive lung carcinoma")
+        self.assertTrue(
+            _is_off_topic_hit(
+                {
+                    "title": "CI value less than 1 defines synergy and antagonism",
+                    "text": "Combination index and dose response define drug synergy.",
+                },
+                frame,
+            )
+        )
+        self.assertFalse(
+            _is_off_topic_hit(
+                {
+                    "title": "TME crosstalk in lung cancer",
+                    "text": "Hypoxia and CAF macrophage crosstalk promote NSCLC invasion.",
+                },
+                frame,
+            )
+        )
+
+    def test_llm_query_fallback_accepts_bulleted_provider_text(self):
+        queries = _fallback_queries_from_text(
+            "- PD-L1 checkpoint inhibitor response\n"
+            "- programmed death ligand 1 immunotherapy NSCLC\n"
+            "Note: broaden with disease synonyms.",
+            limit=4,
+        )
+
+        self.assertEqual(queries[:2], [
+            "PD-L1 checkpoint inhibitor response",
+            "programmed death ligand 1 immunotherapy NSCLC",
+        ])
+
+    async def test_build_auto_context_runs_multilevel_search_and_uses_feedback_terms(self):
+        old_llm_refine = settings.memory.auto_context_llm_refine
+        old_k = settings.memory.auto_context_k
+        old_variants = settings.memory.auto_context_query_variants
+        settings.memory.auto_context_llm_refine = False
+        settings.memory.auto_context_k = 5
+        settings.memory.auto_context_query_variants = 4
+        fake_multilevel = FakeMultilevelSearch()
+        try:
+            result = await build_auto_context(
+                tenant="default",
+                session_id="s1",
+                message="Does PD-L1 predict response in non-small cell lung cancer?",
+                store=FakeStore(),
+                selected_context_count=0,
+                confidence_min=0.5,
+                multilevel_search_fn=fake_multilevel,
+            )
+        finally:
+            settings.memory.auto_context_llm_refine = old_llm_refine
+            settings.memory.auto_context_k = old_k
+            settings.memory.auto_context_query_variants = old_variants
+
+        snippets = result["snippets"]
+        plan = result["plan"]
+        self.assertGreaterEqual(len(snippets), 3)
+        self.assertTrue(all(item.get("auto_context") for item in snippets))
+        self.assertEqual(snippets[0]["source"], "auto_context")
+        self.assertEqual(plan["levels"], ["title", "paper", "sentence"])
+        self.assertEqual([report["level"] for report in plan["level_reports"]], ["title", "paper", "sentence"])
+        self.assertIn("nivolumab", " ".join(fake_multilevel.calls[-1]["query"].lower() for _ in [0]))
+        self.assertIn("search:v1", plan["state_key"])
+        self.assertIn("search:v1", plan["action_key"])
+        self.assertEqual(plan["result_count"], len(snippets))
+        self.assertTrue(plan["note"])
+        self.assertIn("evidence_assembly", plan)
+        self.assertEqual(plan["evidence_assembly"]["information_need"], "question")
+        self.assertGreaterEqual(len(plan["candidate_frames"]), 2)
+        self.assertIn("frame_result_counts", plan["evidence_assembly"])
+
+    async def test_build_auto_context_keeps_sentence_search_fn_compatibility(self):
+        old_llm_refine = settings.memory.auto_context_llm_refine
+        old_k = settings.memory.auto_context_k
+        old_variants = settings.memory.auto_context_query_variants
+        settings.memory.auto_context_llm_refine = False
+        settings.memory.auto_context_k = 2
+        settings.memory.auto_context_query_variants = 1
+        try:
+            result = await build_auto_context(
+                tenant="default",
+                session_id="s1",
+                message="Does PD-L1 predict response in non-small cell lung cancer?",
+                store=FakeStore(),
+                selected_context_count=0,
+                confidence_min=0.5,
+                search_fn=fake_search,
+            )
+        finally:
+            settings.memory.auto_context_llm_refine = old_llm_refine
+            settings.memory.auto_context_k = old_k
+            settings.memory.auto_context_query_variants = old_variants
+
+        self.assertGreaterEqual(len(result["snippets"]), 1)
+
+    async def test_followup_query_reuses_prior_supported_search_frame(self):
+        plan = await plan_auto_context(
+            message="Start by explaining the conceptual analogy and develop the latest candidate frameworks you suggested.",
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior search found evidence for antifungal-inspired cancer therapy.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "llm_refined",
+                                "query": "cancer therapy antifungal strategy immune evidence",
+                                "source": "llm",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        joined = " ".join(item.query.lower() for item in plan.variants)
+        self.assertIn("antifungal", joined)
+        self.assertEqual(plan.variants[0].label, "prior_frame")
+        self.assertTrue(any(item.label == "prior_frame" for item in plan.variants))
+
+    async def test_followup_evidence_puzzle_uses_prior_frame_nodes(self):
+        plan = await plan_auto_context(
+            message="Use what is actually supported and separate direct evidence from hypotheses.",
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior query was about pH, food habits, and tissue growth.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "llm_refined",
+                                "query": "metabolic pathway body pH food habits tissue growth",
+                                "source": "llm",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        assembly = _evidence_assembly(
+            message="Use what is actually supported and separate direct evidence from hypotheses.",
+            plan=plan,
+            snippets=[],
+            level_reports=[],
+        )
+
+        nodes = " ".join(assembly["evidence_puzzle"]["candidate_nodes"]).lower()
+        self.assertIn("food", nodes)
+        self.assertIn("ph", nodes)
+        self.assertTrue(assembly["clarification_recommended"])
+
+    async def test_unanchored_early_hit_feedback_does_not_poison_later_queries(self):
+        old_llm_refine = settings.memory.auto_context_llm_refine
+        old_k = settings.memory.auto_context_k
+        old_variants = settings.memory.auto_context_query_variants
+        settings.memory.auto_context_llm_refine = False
+        settings.memory.auto_context_k = 4
+        settings.memory.auto_context_query_variants = 1
+        noisy_search = FakeNoisyMultilevelSearch()
+        try:
+            result = await build_auto_context(
+                tenant="default",
+                session_id="s-noisy",
+                message="Develop a metabolic pathway relating body pH, food habits, and tissue growth.",
+                store=FakeStore(),
+                selected_context_count=0,
+                confidence_min=0.5,
+                multilevel_search_fn=noisy_search,
+            )
+        finally:
+            settings.memory.auto_context_llm_refine = old_llm_refine
+            settings.memory.auto_context_k = old_k
+            settings.memory.auto_context_query_variants = old_variants
+
+        later_queries = " ".join(call["query"].lower() for call in noisy_search.calls if call["level"] != "title")
+        first_report = result["plan"]["level_reports"][0]
+        assembly = result["plan"]["evidence_assembly"]
+        self.assertNotIn("questionnaire", later_queries)
+        self.assertNotIn("radio", later_queries)
+        self.assertGreater(first_report["rejected_feedback_result_count"], 0)
+        self.assertGreaterEqual(assembly["refinement_quality"]["rejected_feedback_result_count"], 1)
+
+    async def test_high_ambiguity_evidence_puzzle_requests_textual_clarification(self):
+        old_llm_refine = settings.memory.auto_context_llm_refine
+        old_k = settings.memory.auto_context_k
+        old_variants = settings.memory.auto_context_query_variants
+        settings.memory.auto_context_llm_refine = False
+        settings.memory.auto_context_k = 4
+        settings.memory.auto_context_query_variants = 4
+        try:
+            result = await build_auto_context(
+                tenant="default",
+                session_id="s-ambiguous",
+                message="Develop a pathway relating food habits, pH, and something else that promotes tissue growth.",
+                store=FakeStore(),
+                selected_context_count=0,
+                confidence_min=0.5,
+                multilevel_search_fn=FakeNoisyMultilevelSearch(),
+            )
+        finally:
+            settings.memory.auto_context_llm_refine = old_llm_refine
+            settings.memory.auto_context_k = old_k
+            settings.memory.auto_context_query_variants = old_variants
+
+        assembly = result["plan"]["evidence_assembly"]
+        self.assertTrue(assembly["clarification_recommended"])
+        self.assertIn("opening paragraph must end", assembly["prompt_context"].lower())
+        self.assertIn("candidate_frames", assembly)
+        self.assertIn("evidence_puzzle", assembly)
+        self.assertIn("absent example candidates", assembly["prompt_context"].lower())
+        self.assertIn("named candidate", assembly["prompt_context"].lower())
+        self.assertIn("only supported evidence", assembly["prompt_context"].lower())
+
+
+if __name__ == "__main__":
+    unittest.main()

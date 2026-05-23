@@ -1,0 +1,52 @@
+{
+  "claims": [
+    {
+      "claim_id": "lc_tme_caf_hgf_met_001",
+      "domain": "lung_cancer_tme",
+      "topic": "CAF_HGF_MET_EMT",
+      "claim": "CAF-derived HGF can activate MET/c-MET signaling and contribute to EMT-associated tumor progression or therapy resistance in lung cancer contexts.",
+      "entities": ["CAF", "HGF", "MET/c-MET", "EMT", "lung cancer"],
+      "relation": {"subject": "HGF", "predicate": "activates", "object": "MET/c-MET signaling"},
+      "qualifiers": {"cancer_type": "lung cancer", "certainty": "review_supported", "notes": "Mechanistic wording should preserve HGF to MET/c-MET direction."},
+      "required_mechanism_nodes": ["CAF", "HGF", "MET/c-MET", "EMT"],
+      "evidence_strength": "review_supported",
+      "unacceptable_variants": [
+        "HGF decreases MET signaling.",
+        "CAF-derived HGF causes EMT without receptor involvement.",
+        "MET suppresses HGF production as the main causal mechanism."
+      ]
+    },
+    {
+      "claim_id": "lc_tme_tam_cd8_001",
+      "domain": "lung_cancer_tme",
+      "topic": "TAM_CD8_IMMUNOSUPPRESSION",
+      "claim": "M2-like tumor-associated macrophages can promote immunosuppression and reduce effective cytotoxic T-cell anti-tumor activity in lung cancer contexts.",
+      "entities": ["TAM", "CD8 T cells", "lung cancer"],
+      "relation": {"subject": "M2-like TAM", "predicate": "suppresses", "object": "cytotoxic anti-tumor immunity"},
+      "qualifiers": {"certainty": "review_supported"},
+      "required_mechanism_nodes": ["TAM", "CD8 T cells", "immunosuppression"],
+      "unacceptable_variants": ["M2-like TAMs activate cytotoxic anti-tumor CD8 immunity as their main role."]
+    },
+    {
+      "claim_id": "lc_tme_hypoxia_immune_escape_001",
+      "domain": "lung_cancer_tme",
+      "topic": "HYPOXIA_IMMUNE_ESCAPE",
+      "claim": "Hypoxia can promote HIF-linked angiogenesis, metabolic adaptation, and immune escape in lung cancer tumor microenvironments.",
+      "entities": ["hypoxia", "HIF", "angiogenesis", "immune escape", "lung cancer"],
+      "relation": {"subject": "hypoxia", "predicate": "contributes_to", "object": "immune escape"},
+      "qualifiers": {"certainty": "review_supported"},
+      "required_mechanism_nodes": ["hypoxia", "HIF", "angiogenesis", "immune escape"],
+      "unacceptable_variants": ["Hypoxia mainly restores anti-tumor immunity in lung cancer TME."]
+    },
+    {
+      "claim_id": "lc_scope_cross_cancer_001",
+      "domain": "lung_cancer_tme",
+      "topic": "CROSS_CANCER_TRANSFER",
+      "claim": "Evidence from another cancer type should be framed as transfer hypothesis unless lung-cancer-specific support is available.",
+      "entities": ["lung cancer", "breast cancer", "evidence"],
+      "relation": {"subject": "cross-cancer evidence", "predicate": "requires_qualification", "object": "lung-cancer-specific claim"},
+      "qualifiers": {"certainty": "methodological_guardrail"},
+      "unacceptable_variants": ["A breast cancer CAF mechanism is proven NSCLC evidence without lung-cancer support."]
+    }
+  ]
+}

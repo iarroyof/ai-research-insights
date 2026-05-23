@@ -1,0 +1,45 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "biomedical_ambiguous_evidence_assembly_001",
+      "conversation_file": "data/conversations/seed/biomedical_ambiguous_evidence_assembly_001.jsonl",
+      "scenario_type": "ambiguous_evidence_assembly",
+      "domain": "biomedical_research",
+      "user_profile": "research_explorer",
+      "conversation_goal": "Test whether the live chatbot assembles partial evidence for a vague biomedical relation without inventing missing bridges and asks textual clarification in the answer.",
+      "expected_capabilities": [
+        "candidate_frame_search",
+        "partial_evidence_synthesis",
+        "avoid_unsupported_bridge",
+        "textual_clarification"
+      ],
+      "target_gold_claims": [],
+      "target_mechanism_graphs": [],
+      "success_criteria": {
+        "min_evidence_assembly_quality": 0.5,
+        "max_unsupported_bridge_claims": 0
+      }
+    },
+    {
+      "scenario_id": "cross_domain_fungal_therapy_assembly_001",
+      "conversation_file": "data/conversations/seed/cross_domain_fungal_therapy_assembly_001.jsonl",
+      "scenario_type": "cross_domain_evidence_assembly",
+      "domain": "biomedical_research",
+      "user_profile": "research_explorer",
+      "conversation_goal": "Test whether a cross-domain biomedical request clarifies intent, avoids case-report vocabulary drift, and keeps follow-up frameworks bounded by supported retrieval.",
+      "expected_capabilities": [
+        "candidate_frame_search",
+        "scope_clarification",
+        "cross_domain_feedback_filtering",
+        "followup_frame_continuity",
+        "avoid_unsupported_framework"
+      ],
+      "target_gold_claims": [],
+      "target_mechanism_graphs": [],
+      "success_criteria": {
+        "min_evidence_assembly_quality": 0.5,
+        "max_unsupported_bridge_claims": 0
+      }
+    }
+  ]
+}

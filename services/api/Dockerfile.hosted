@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+COPY services/api/requirements.hosted.txt /tmp/requirements.txt
+RUN pip install --no-warn-script-location --upgrade pip && \
+    pip install --no-warn-script-location -r /tmp/requirements.txt
+
+COPY services/api /app
+COPY config /app/config
+
+EXPOSE 8080
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

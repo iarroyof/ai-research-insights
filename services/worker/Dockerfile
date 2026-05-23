@@ -6,7 +6,8 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 
 WORKDIR /app
 
-COPY services/api/requirements.txt /tmp/requirements.txt
+ARG REQUIREMENTS_FILE=services/api/requirements.hosted.txt
+COPY ${REQUIREMENTS_FILE} /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-warn-script-location --upgrade pip && \
     pip install --no-warn-script-location -r /tmp/requirements.txt

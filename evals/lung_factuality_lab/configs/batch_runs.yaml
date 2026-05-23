@@ -1,0 +1,13 @@
+{
+  "batch_id": "lung_factuality_lab_batch_001",
+  "scenarios": [
+    "novice_tme_basic_factors_001",
+    "novice_tme_wrong_simplification_001",
+    "expert_hgf_met_direction_001",
+    "expert_tam_cd8_immunosuppression_001",
+    "expert_hypoxia_immune_escape_001",
+    "broader_oncology_cross_cancer_transfer_001",
+    "correction_scope_tme_only_001",
+    "citation_drift_lung_vs_breast_001"
+  ]
+}

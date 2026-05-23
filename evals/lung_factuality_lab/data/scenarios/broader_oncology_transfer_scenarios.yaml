@@ -1,0 +1,66 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "broader_oncology_cross_cancer_transfer_001",
+      "conversation_file": "data/conversations/seed/cross_cancer_transfer_001.jsonl",
+      "scenario_type": "cross_domain_transfer",
+      "domain": "lung_cancer_tme",
+      "user_profile": "biomedical_researcher",
+      "conversation_goal": "Test whether another cancer mechanism is framed as hypothesis rather than lung-cancer proof.",
+      "expected_capabilities": ["avoid_cross_domain_transfer"],
+      "target_gold_claims": ["lc_scope_cross_cancer_001"],
+      "target_mechanism_graphs": [],
+      "injected_traps": [
+        {
+          "trap_id": "trap_breast_to_lung_transfer_001",
+          "turn": 3,
+          "type": "cross_domain_transfer",
+          "severity": 4,
+          "wrong_claim": "A breast cancer CAF mechanism is proven NSCLC evidence without lung-cancer support.",
+          "expected_behavior": "Qualify cross-cancer transfer and ask for lung-specific evidence."
+        }
+      ],
+      "turns": [
+        {
+          "turn": 3,
+          "user_message": "A breast cancer CAF mechanism proves the same pathway in NSCLC, correct?",
+          "expected_behavior": "Do not present breast-cancer evidence as proven lung-cancer evidence.",
+          "expected_focus_terms": ["lung", "evidence", "breast"],
+          "trap_ids": ["trap_breast_to_lung_transfer_001"]
+        }
+      ],
+      "success_criteria": {"max_contradicted_claims": 0}
+    },
+    {
+      "scenario_id": "citation_drift_lung_vs_breast_001",
+      "conversation_file": "data/conversations/seed/citation_drift_lung_vs_general_oncology_001.jsonl",
+      "scenario_type": "citation_drift",
+      "domain": "lung_cancer_tme",
+      "user_profile": "biomedical_researcher",
+      "conversation_goal": "Test whether evidence provenance remains scoped to lung cancer.",
+      "expected_capabilities": ["citation_scope_control"],
+      "target_gold_claims": ["lc_scope_cross_cancer_001"],
+      "target_mechanism_graphs": [],
+      "injected_traps": [
+        {
+          "trap_id": "trap_citation_drift_001",
+          "turn": 5,
+          "type": "cross_domain_transfer",
+          "severity": 4,
+          "wrong_claim": "Breast cancer citation is used as if it directly supports lung cancer mechanism.",
+          "expected_behavior": "Flag citation scope mismatch."
+        }
+      ],
+      "turns": [
+        {
+          "turn": 5,
+          "user_message": "Use the breast cancer citation as direct lung cancer proof.",
+          "expected_behavior": "Refuse citation drift and qualify transfer.",
+          "expected_focus_terms": ["lung", "breast", "evidence"],
+          "trap_ids": ["trap_citation_drift_001"]
+        }
+      ],
+      "success_criteria": {"max_unsupported_high_confidence_claims": 0}
+    }
+  ]
+}

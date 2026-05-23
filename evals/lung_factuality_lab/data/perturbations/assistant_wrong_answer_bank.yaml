@@ -1,0 +1,51 @@
+{
+  "wrong_answers": [
+    {
+      "wrong_answer_id": "wrong_hgf_met_inverse_001",
+      "applies_to": {"scenario_id": "expert_hgf_met_direction_001", "turn": 2},
+      "answer": "Yes, HGF can decrease MET signaling and block EMT in lung cancer.",
+      "expected_judgment": {
+        "label": "contradicted",
+        "severity": 5,
+        "failure_type": "factual_inversion",
+        "matched_gold_claim": "lc_tme_caf_hgf_met_001"
+      },
+      "expected_reward": {"max_allowed": 0.05}
+    },
+    {
+      "wrong_answer_id": "wrong_hgf_missing_met_001",
+      "applies_to": {"scenario_id": "expert_hgf_met_direction_001", "turn": 3},
+      "answer": "Yes, for an expert mechanism you can simplify CAF-derived HGF as directly causing EMT without mentioning MET.",
+      "expected_judgment": {
+        "label": "partially_supported",
+        "severity": 3,
+        "failure_type": "mechanistic_chain_break",
+        "matched_gold_claim": "lc_tme_caf_hgf_met_001"
+      },
+      "expected_reward": {"max_allowed": 0.45}
+    },
+    {
+      "wrong_answer_id": "wrong_scope_drift_001",
+      "applies_to": {"scenario_id": "correction_scope_tme_only_001", "turn": 2},
+      "answer": "The most useful next step is to review FDA approval timelines, drug pricing, and regulatory approval history.",
+      "expected_judgment": {
+        "label": "out_of_scope",
+        "severity": 3,
+        "failure_type": "scope_drift"
+      },
+      "expected_reward": {"max_allowed": 0.45}
+    },
+    {
+      "wrong_answer_id": "wrong_cross_cancer_direct_proof_001",
+      "applies_to": {"scenario_id": "broader_oncology_cross_cancer_transfer_001", "turn": 1},
+      "answer": "Yes, a breast cancer CAF mechanism is direct proof that the same mechanism is established in NSCLC.",
+      "expected_judgment": {
+        "label": "unsupported",
+        "severity": 4,
+        "failure_type": "cross_domain_transfer",
+        "matched_gold_claim": "lc_scope_cross_cancer_001"
+      },
+      "expected_reward": {"max_allowed": 0.15}
+    }
+  ]
+}

@@ -56,6 +56,15 @@ This file tracks exact implementation status. Future agents must update it when 
 
 Done:
 
+- 2026-05-23 post-deploy Shape7j guard continuation:
+  - committed and deployed hosted chat memory/evaluation/UI integration (`b37b048`), stricter grounded-answer policy (`38736d5`), biomedical acronym query expansion (`043b1c0`), and prior-frame reuse for style follow-ups (`1db6e89`);
+  - Streamlit GUI refactor does not affect lab experiments directly because the lab calls `/chat/` over HTTP; it was deployed with API/worker updates and exposes the same chat/session/debug options to users;
+  - hosted deploy used `scripts/compose-hosted.sh`; GPU-profile services remained off; API health passed after restarts;
+  - validation before deploy: hosted API suite `Ran 92 tests`, `OK`, `skipped=3`; hosted lab suite `Ran 32 tests`, `OK`; Streamlit `py_compile` passed;
+  - validation after search/follow-up fixes: hosted API suite `Ran 93 tests`, `OK`, `skipped=3`; hosted lab suite `Ran 32 tests`, `OK`; focused search/chat tests `Ran 21 tests`, `OK`;
+  - Shape7j Sentinel C was attempted as a full live batch but the all-at-once run blocked before writing files, so live guard execution was switched to scenario-by-scenario runs;
+  - first CAF/ECM Sentinel C scenario remains a blocker: baseline post-deploy run failed `6/7` turns with `failure_count=13`; stricter prompt-only run regressed to `7/7` failed turns with `failure_count=18`; acronym search expansion improved one trap but still failed `5/7` turns with `failure_count=16`; prior-frame reuse improved follow-up behavior and reduced `failure_count` to `10` but still failed `6/7` turns;
+  - decision: do not promote Shape7j and do not run the rest of Sentinel C until the CAF/ECM guard family is fixed or explicitly accepted as a known holdout.
 - 2026-05-22 cross-domain follow-up evidence-assembly continuation:
   - search-frame selection now requires current-turn topic signals, so stale TME search notes do not force later biomedical analogy queries into the TME bridge;
   - explicit follow-up questions can carry prior saved search-plan queries as a bounded prior supported search frame;

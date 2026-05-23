@@ -367,7 +367,35 @@ shapes:
         avg_reward: 1.0
         failure_count: 0
         notes: Fresh live endpoint rerun cleared the ambiguous sparse-evidence scenario; the full two-scenario rerun through a one-off container was stopped after hanging on the second scenario, leaving no active experiment.
-    promotion_decision: keep_shape7j_guarded_runtime_candidate_only_until_boundary_evaluator_fix_and_stratified_guard_clear
+      - path: evals/lung_factuality_lab/runs/shape7j_guard_post_deploy_scenarios/caf_ecm_stiffness_001__gen_005
+        mode: live_single_sentinel_c_post_deploy_baseline
+        conversations: 1
+        turns: 7
+        failure_count: 13
+        failed_turns: 6
+        decision: failed_guard_stop_broader_sentinel
+      - path: evals/lung_factuality_lab/runs/shape7j_guard_post_deploy_scenarios/caf_ecm_stiffness_001__gen_005_grounding_policy
+        mode: live_single_sentinel_c_stricter_grounding_policy
+        conversations: 1
+        turns: 7
+        failure_count: 18
+        failed_turns: 7
+        decision: rejected_prompt_only_regression
+      - path: evals/lung_factuality_lab/runs/shape7j_guard_post_deploy_scenarios/caf_ecm_stiffness_001__gen_005_acronym_search
+        mode: live_single_sentinel_c_acronym_search
+        conversations: 1
+        turns: 7
+        failure_count: 16
+        failed_turns: 5
+        decision: partial_improvement_but_failed_guard
+      - path: evals/lung_factuality_lab/runs/shape7j_guard_post_deploy_scenarios/caf_ecm_stiffness_001__gen_005_followup_frame
+        mode: live_single_sentinel_c_followup_prior_frame
+        conversations: 1
+        turns: 7
+        failure_count: 10
+        failed_turns: 6
+        decision: partial_improvement_but_failed_guard
+    promotion_decision: keep_shape7j_candidate_only_failed_stromal_ecm_sentinel_guard
 
 blocked_shapes:
   - shape0_baseline
@@ -376,8 +404,8 @@ blocked_shapes:
   - shape3
 
 next_allowed_actions:
-  - Fix the evidence-assembly evaluator so meta-boundary and snippet-constraint statements are safe evidence-limitation claims, then rerun Shape7j saved-answer replay and the two-scenario live microfit.
-  - Run a stratified live guard for the Shape7j evidence-assembly runtime/search changes only after the boundary evaluator fix clears the microfit.
+  - Do not promote Shape7j; diagnose and fix the CAF/ECM stromal-stiffness guard family before running the rest of Sentinel C.
+  - Improve mechanism-chain evidence retrieval/scoring for required-node coverage and reduce unsupported relation penalties only after replay proves the evaluator is not over-penalizing caveated answers.
   - Use the Shape5 sentinel_b guard and HGF diagnostic replay evidence before any broader Stage 2 rerun.
   - Keep shape4 as current-best until the TAM/CD8 follow-up guard evidence is reviewed.
   - If a new guard regresses, diagnose that run and create a new candidate without revisiting shape1, shape2, or shape3.

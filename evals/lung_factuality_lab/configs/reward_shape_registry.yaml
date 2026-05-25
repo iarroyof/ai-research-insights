@@ -3,7 +3,7 @@
 # A shape is accepted only when live endpoint results improve on the comparable prior live run.
 
 current_best_shape: shape4
-current_stage: shape7l_caf_ecm_guard_replay_cleared_stratified_guard_pending
+current_stage: shape7m_hgf_evaluator_and_sse_fix_correction_scope_microcheck_pending
 selection_rule: >-
   Prefer the highest live-endpoint average reward on comparable scenarios, with fewer
   high-severity evaluator false positives and no regression in trap resistance. Replay-only
@@ -435,7 +435,54 @@ shapes:
         missed_injected_traps: 0
         decision: cleared_saved_live_replay_gate_start_stratified_guard
         notes: Replay of the latest live answers cleared after generic evaluator support for evidence-boundary instructions, rejected false-premise wording, and diagnostic trace field lists.
-    promotion_decision: shape7l_caf_ecm_saved_live_replay_cleared_run_stratified_guard_before_stage2
+      - path: evals/lung_factuality_lab/runs/shape7l_live_sentinel_c
+        mode: live_stratified_guard_after_caf_ecm_replay_clear
+        conversations: 8
+        turns: 56
+        avg_reward: 0.6365
+        failure_count: 63
+        failed_turns: 35
+        missed_injected_traps: 2
+        decision: improved_but_failed_broader_stage2_gate
+        notes: Improved over Shape6 Sentinel C avg_reward 0.4337/failure_count 119, but broad live guard still had too many unsupported mechanisms and HGF/correction false positives; do not start Stage 2 from this shape.
+      - path: evals/lung_factuality_lab/runs/shape7m_live_hgf_gen003_correction_detector
+        mode: live_single_hgf_after_correction_detector_narrowing
+        conversations: 1
+        turns: 7
+        avg_reward: 0.5280
+        failure_count: 5
+        failed_turns: 5
+        missed_injected_traps: 0
+        decision: correction_detector_fixed_turn1_but_rejected_false_premise_evaluator_false_positives_remained
+        notes: Confirmed normal task constraints containing 'not clinical treatment advice' no longer trigger correction-only answer mode.
+      - path: evals/lung_factuality_lab/runs/shape7m_replay_hgf_gen003_markdown_rejection_fix
+        mode: saved_live_hgf_rejected_fixture_markdown_evaluator_fix
+        conversations: 1
+        turns: 7
+        failure_count: 3
+        failed_turns: 3
+        highest_severity_failure: 3
+        decision: replay_improved_false_premise_and_quoted_fixture_scoring
+        notes: Removed false factual-inversion penalties for rejected/quoted HGF suppression phrasing; remaining issues were missing required nodes and unsupported diagnostic wording.
+      - path: evals/lung_factuality_lab/runs/shape7m_live_hgf_gen003_after_sse_evaluator_fix
+        mode: live_single_hgf_after_sse_and_evaluator_deploy
+        conversations: 1
+        turns: 7
+        failure_count: 4
+        failed_turns: 4
+        missed_injected_traps: 0
+        decision: live_generation_stable_replay_needed_for_new_absence_marker_false_positives
+        notes: API/Streamlit SSE hardening deployed; live generation stable, but absence/rejection phrases still needed evaluator marker normalization.
+      - path: evals/lung_factuality_lab/runs/shape7m_replay_hgf_gen003_live2_absence_marker_fix
+        mode: saved_live_hgf_absence_and_rejection_marker_fix
+        conversations: 1
+        turns: 7
+        failure_count: 2
+        failed_turns: 2
+        highest_severity_failure: 3
+        decision: cleared_factual_inversion_false_positive_replay_gate_next_correction_scope_microcheck
+        notes: Generic markers for 'without defining', 'unsupported claims about', and 'which contradict' removed remaining rejected-premise factual inversion false positives from the fresh live HGF trace.
+    promotion_decision: shape7m_hgf_evaluator_false_positive_replay_cleared_run_correction_scope_microcheck_before_any_stage2
 
 blocked_shapes:
   - shape0_baseline
@@ -444,7 +491,8 @@ blocked_shapes:
   - shape3
 
 next_allowed_actions:
-  - Shape7l cleared saved-live CAF/ECM replay after evaluator and diagnostic-mode fixes; run Sentinel C stratified live guard before broader Stage 2.
+  - Shape7l Sentinel C improved over Shape6 but failed the broader Stage 2 gate; do not start Stage 2 until Shape7m correction-scope/citation live microchecks clear.
+  - Shape7m HGF replay cleared rejected false-premise and quoted-fixture false positives; run correction_scope_tme_only_001__gen_004 next because Sentinel C still showed scope/correction weaknesses.
   - Improve mechanism-chain evidence retrieval/scoring for required-node coverage and reduce unsupported relation penalties only after replay proves the evaluator is not over-penalizing caveated answers.
   - Use the Shape5 sentinel_b guard and HGF diagnostic replay evidence before any broader Stage 2 rerun.
   - Keep shape4 as current-best until the TAM/CD8 follow-up guard evidence is reviewed.

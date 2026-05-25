@@ -27,7 +27,7 @@ ENTITY_ALIASES = {
 }
 
 PREDICATES = {
-    "activates": ["activates", "activate", "increases", "promotes", "stimulates"],
+    "activates": ["activates", "activate", "activating", "increases", "promotes", "stimulates"],
     "decreases": ["decrease", "decreases", "reduce", "reduces", "block", "blocks", "suppress", "suppresses", "inhibit", "inhibits"],
     "contributes_to": ["contributes", "contribute", "drives", "supports", "promotes", "causes", "leads", "lead", "linked", "link"],
     "irrelevant": ["irrelevant", "not needed", "unnecessary"],

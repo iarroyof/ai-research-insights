@@ -320,6 +320,7 @@ def render_chat():
             citations_data = None
             warnings_data = []
             debug_data = {}
+            stream_error = None
             placeholder = st.empty()
 
             payload_options = {
@@ -360,6 +361,10 @@ def render_chat():
                                 citations_data = data.get("data", {})
                             elif event_type in {"warning", "consistency_warning"}:
                                 warnings_data.append(data.get("data", {}))
+                            elif event_type == "error":
+                                stream_error = (data.get("data") or {}).get("message") or "The chat stream stopped before completion."
+                                warnings_data.append(data.get("data", {}))
+                                break
                             elif event_type in {"memory_debug", "reward", "evidence_table", "conversation_frame", "semantic_drift_trace"}:
                                 debug_data[event_type] = data.get("data", {})
                             elif event_type == "final":
@@ -370,6 +375,8 @@ def render_chat():
                             answer_text += data_str
                             placeholder.markdown(answer_text)
 
+            if stream_error:
+                st.warning(stream_error)
             if citations_data:
                 with st.expander("Citations & Sources"):
                     st.json(citations_data)
@@ -386,6 +393,18 @@ def render_chat():
                     "content": answer_text,
                     "citations": citations_data,
                     "warnings": warnings_data,
+                    "debug": debug_data,
+                }
+            )
+    except httpx.RemoteProtocolError:
+        st.warning("The chat stream was interrupted before completion. This can happen if the API restarts during a response; please retry the message.")
+        if answer_text:
+            st.session_state["chat_messages"].append(
+                {
+                    "role": "assistant",
+                    "content": answer_text,
+                    "citations": citations_data,
+                    "warnings": warnings_data + [{"message": "Stream interrupted before final event."}],
                     "debug": debug_data,
                 }
             )

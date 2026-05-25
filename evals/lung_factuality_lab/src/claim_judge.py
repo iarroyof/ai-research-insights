@@ -146,10 +146,11 @@ def judge_claims(
     has_biomedical_entities = any(claim.entities for claim in claims)
     has_scope_drift = any(j.error_type == "scope_drift" for j in out)
     has_citation_scope_guidance = any(_is_citation_scope_guidance(claim.text.lower()) for claim in claims)
+    has_rejected_false_premise = any(j.reason.startswith("Claim rejects an unacceptable variant") for j in out)
     boundary_only_answer = _is_boundary_only_answer(claims, tag_set)
     skip_graph_scoring = bool(
         tag_set & {"agent_observability", "diagnosis", "evaluator_fixture", "reward_observability"}
-    ) or has_citation_scope_guidance or boundary_only_answer
+    ) or has_citation_scope_guidance or boundary_only_answer or ("user_false_premise" in tag_set and has_rejected_false_premise)
     if graphs and claims and has_biomedical_entities and not severe_contradiction and not has_scope_drift and not skip_graph_scoring:
         graph, missing_nodes, completeness = find_best_mechanism_graph(claims, graphs)
         if graph and missing_nodes:
@@ -211,8 +212,9 @@ def _has_met_token(text: str) -> bool:
 
 def _cross_domain_transfer(claim: ExtractedClaim) -> bool:
     lower = claim.text.lower()
+    plain = lower.replace("*", "").replace("_", "")
     if any(
-        marker in lower
+        marker in plain
         for marker in (
             "not asserted as proven",
             "not as direct proof",
@@ -249,10 +251,11 @@ def _matches_expected_focus(lower: str, expected_terms: set[str]) -> bool:
 
 def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> bool:
     lower = claim.text.lower()
+    plain = lower.replace("*", "").replace("_", "")
     if not _mentions_unacceptable_variant(claim, gold):
         return False
     if any(
-        marker in lower
+        marker in plain
         for marker in (
             "aligns with the provided context",
             "aligns with the current evidence",
@@ -265,7 +268,7 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
     ):
         return False
     return any(
-        marker in lower
+        marker in plain
         for marker in (
             "not agree",
             "would not agree",
@@ -307,7 +310,14 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
             "provided context does not",
             "context does not",
             "does not support",
+            "do not support",
+            "doesn't support",
             "does not directly support",
+            "without defining",
+            "without establishing",
+            "unsupported claims about",
+            "which contradict",
+            "which contradicts",
             "cannot accurately",
             "cannot be accurately",
             "cannot phrase",
@@ -315,6 +325,20 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
             "not endorse",
             "not decrease",
             "not decreases",
+            "not decreasing",
+            "not reduce",
+            "not reduces",
+            "not reducing",
+            "not block",
+            "not blocks",
+            "not blocking",
+            "not suppress",
+            "not suppresses",
+            "not suppressing",
+            "not a suppressor",
+            "not inhibit",
+            "not inhibits",
+            "not inhibiting",
             "rather than decreasing",
             "rather than blocking",
             "instead",
@@ -326,11 +350,28 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
             "treated as authoritative",
             "guide the benchmark",
             "which evidence to prioritize",
+            "invent an unsupported",
+            "unsupported mechanistic link",
+            "should avoid this phrasing",
+            "avoid this phrasing",
+            "directly contradicts",
+            "contradicted and unsupported",
             "conflicts with evidence",
             "conflicts with",
             "inconsistent with evidence",
             "inconsistent with",
             "direct contradiction",
+            "is contradicted",
+            "are contradicted",
+            "directly contradict",
+            "directly contradicts",
+            "contradicted and unsupported",
+            "plausible but wrong",
+            "incorrectly state",
+            "incorrectly states",
+            "why it is wrong",
+            "why it’s wrong",
+            "hypothetical negative feedback",
         )
     )
 
@@ -394,8 +435,9 @@ def _is_boundary_only_answer(claims: list[ExtractedClaim], tag_set: set[str]) ->
     return boundary_count > 0 and substantive_count == 0
 
 def _is_evidence_limitation_or_caveat(lower: str) -> bool:
+    plain = lower.replace("*", "").replace("_", "")
     return any(
-        marker in lower
+        marker in plain
         for marker in (
             "current response is constrained",
             "response is constrained",
@@ -452,13 +494,20 @@ def _is_evidence_limitation_or_caveat(lower: str) -> bool:
             "treated as authoritative",
             "guide the benchmark",
             "which evidence to prioritize",
+            "invent an unsupported",
+            "unsupported mechanistic link",
+            "should avoid this phrasing",
+            "avoid this phrasing",
+            "directly contradicts",
+            "contradicted and unsupported",
         )
     )
 
 
 def _is_evidence_assembly_boundary(lower: str) -> bool:
+    plain = lower.replace("*", "").replace("_", "")
     return any(
-        marker in lower
+        marker in plain
         for marker in (
             "missing link",
             "missing bridge",
@@ -497,8 +546,9 @@ def _is_evidence_assembly_boundary(lower: str) -> bool:
 
 
 def _contains_offtopic_terms(lower: str) -> bool:
+    plain = lower.replace("*", "").replace("_", "")
     return any(
-        marker in lower
+        marker in plain
         for marker in (
             "fda",
             "approval timeline",
@@ -513,8 +563,9 @@ def _contains_offtopic_terms(lower: str) -> bool:
 
 
 def _is_citation_scope_guidance(lower: str) -> bool:
+    plain = lower.replace("*", "").replace("_", "")
     citation_frame = any(
-        marker in lower
+        marker in plain
         for marker in (
             "citation",
             "evidence",
@@ -525,7 +576,7 @@ def _is_citation_scope_guidance(lower: str) -> bool:
         )
     )
     scope_frame = any(
-        marker in lower
+        marker in plain
         for marker in (
             "general oncology",
             "lung-cancer-specific",
@@ -535,7 +586,7 @@ def _is_citation_scope_guidance(lower: str) -> bool:
         )
     )
     transfer_guard = any(
-        marker in lower
+        marker in plain
         for marker in (
             "unless",
             "only if",
@@ -603,10 +654,11 @@ def _wrong_direction_targets_met(lower: str) -> bool:
 
 
 def _is_meta_observability_claim(lower: str, tag_set: set[str]) -> bool:
+    plain = lower.replace("*", "").replace("_", "")
     if not tag_set & {"agent_observability", "diagnosis"}:
         return False
     return any(
-        marker in lower
+        marker in plain
         for marker in (
             "trace",
             "inspect",
@@ -631,10 +683,11 @@ def _is_meta_observability_claim(lower: str, tag_set: set[str]) -> bool:
 
 
 def _is_scope_correction_acknowledgement(lower: str, tag_set: set[str]) -> bool:
+    plain = lower.replace("*", "").replace("_", "")
     if not (tag_set & {"scope_correction", "conversation_memory", "post_correction_adherence"}):
         return False
     return any(
-        marker in lower
+        marker in plain
         for marker in (
             "session scope correction",
             "scope correction",

@@ -978,3 +978,56 @@ Tests run:
   - `wrong_replay_smoke` wrote full run outputs;
   - `batch_seed_variant_smoke` wrote full batch outputs.
 - Hosted stack status checked after validation; existing services remained up and GPU services remained off.
+
+## Update 2026-05-25: Shape7m SSE Stability And Evaluator False-Positive Reduction
+
+Implemented:
+
+- Verified authoritative git and hosted stack status before changes; GPU-profile services remained off.
+- Narrowed chat correction-only detection so normal task constraints such as "not clinical treatment advice" no longer trigger correction acknowledgement mode.
+- Hardened API SSE streaming:
+  - server-side generator exceptions now emit a structured `error` SSE event before stream end when possible;
+  - server logs retain the exception without exposing secrets to the client.
+- Hardened Streamlit chat UI:
+  - structured `error` events show as warnings;
+  - interrupted HTTP streams show a retry warning instead of a raw traceback;
+  - partial assistant text is preserved when a stream is interrupted after tokens were received.
+- Improved lab claim extraction/judging for rejected false premises and evaluator fixtures:
+  - `activating` is recognized as an activation predicate;
+  - rejected or quoted wrong phrases are matched against markdown-normalized text;
+  - generic rejection/absence markers such as `do not support`, `without defining`, `unsupported claims about`, and `which contradict` prevent false factual-inversion penalties.
+- Updated `evals/lung_factuality_lab/configs/reward_shape_registry.yaml`:
+  - recorded Shape7l Sentinel C outcome;
+  - recorded Shape7m HGF live/replay outcomes;
+  - set current stage to `shape7m_hgf_evaluator_and_sse_fix_correction_scope_microcheck_pending`;
+  - kept Stage 2 blocked until correction-scope/citation microchecks clear.
+- Rebuilt and restarted only `api` and `streamlit` via `scripts/compose-hosted.sh`; `worker-cpu` stayed running and GPU services stayed off.
+
+Partially implemented:
+
+- Shape7m HGF replay cleared rejected false-premise factual-inversion false positives, but fresh live generation still needs broader guard validation.
+- HGF remaining replay failures are now lower severity and mainly about missing required mechanism nodes or unsupported diagnostic wording, not missed traps.
+- SSE hardening improves UI behavior on server-side stream failures, but it cannot prevent interruption if the API container is intentionally rebuilt during an active user chat.
+
+Not implemented:
+
+- Broader Stage 2 rerun after Shape7m.
+- Full Sentinel C rerun after the latest Shape7m evaluator marker updates.
+- Higher-confidence semantic drift model panel.
+- Full OpenIE source-sentence NLI calibration and post-generation claim repair beyond the current lightweight guard.
+
+Blocked:
+
+- Do not start Stage 2 from Shape7l/Shape7m yet; Shape7l Sentinel C improved over Shape6 but still had too many failed turns and missed traps.
+- Next required live microcheck is `correction_scope_tme_only_001__gen_004`, followed by citation drift if correction scope clears.
+
+Tests run:
+
+- `./scripts/compose-hosted.sh ps`: hosted stack up; `api`, `streamlit`, and `worker-cpu` running; GPU services not running.
+- `curl -fsS http://127.0.0.1:18081/health`: `{"status":"ok"}`.
+- `tests.test_chat_auto_context`: `Ran 7 tests`, `OK`.
+- Focused API suite `tests.test_memory_web_search tests.test_memory_search_agent tests.test_chat_auto_context`: `Ran 46 tests`, `OK`.
+- Lab claim-judging focused tests: `Ran 29 tests`, `OK`.
+- Full lung factuality lab tests: `Ran 45 tests`, `OK`.
+- Shape7m HGF live run: `evals/lung_factuality_lab/runs/shape7m_live_hgf_gen003_after_sse_evaluator_fix`.
+- Shape7m HGF replay after absence-marker fix: `evals/lung_factuality_lab/runs/shape7m_replay_hgf_gen003_live2_absence_marker_fix`, failed turns reduced to 2, highest severity reduced to 3, missed traps 0.

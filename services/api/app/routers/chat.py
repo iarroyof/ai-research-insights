@@ -352,8 +352,6 @@ def _is_scope_or_memory_correction_only(message: str) -> bool:
         "keep the scope",
         "do not drift",
         "don't drift",
-        "not clinical",
-        "not treatment",
     )
     return any(marker in lower for marker in correction_markers)
 

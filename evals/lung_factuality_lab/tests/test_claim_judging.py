@@ -282,6 +282,78 @@ class ClaimJudgingTests(unittest.TestCase):
 
         self.assertFalse(any(j.error_type == "factual_inversion" for j in judgments))
 
+    def test_do_not_support_hgf_suppression_is_not_contradicted(self):
+        scenario = load_scenario("expert_hgf_met_direction_001")
+        claims = extract_claims(
+            "The provided context snippets do not support the claim that HGF suppresses c-MET.",
+            turn=2,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=scenario.target_mechanism_graphs,
+            traps=scenario.injected_traps,
+        )
+
+        self.assertFalse(any(j.error_type == "factual_inversion" for j in judgments))
+        self.assertTrue(any(j.label in {"supported", "partially_supported"} for j in judgments))
+
+    def test_activating_met_not_suppressing_is_directionally_supported(self):
+        scenario = load_scenario("expert_hgf_met_direction_001")
+        claims = extract_claims(
+            "The context explicitly describes HGF as activating c-MET signaling, not suppressing it.",
+            turn=2,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=[],
+            traps=scenario.injected_traps,
+        )
+
+        self.assertFalse(any(j.error_type == "factual_inversion" for j in judgments))
+        self.assertTrue(any(j.label in {"supported", "partially_supported"} for j in judgments))
+
+    def test_plausible_but_wrong_fixture_is_not_treated_as_assertion(self):
+        scenario = load_scenario("expert_hgf_met_direction_001")
+        claims = extract_claims(
+            "Plausible but wrong answer a chatbot might give: A chatbot might incorrectly state that HGF suppresses c-MET signaling. Why it is wrong: the context describes HGF as activating c-MET.",
+            turn=3,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=scenario.target_mechanism_graphs,
+            traps=scenario.injected_traps,
+            turn_tags=["oversimplification_trap", "mechanistic_completeness"],
+        )
+
+        self.assertFalse(any(j.error_type == "factual_inversion" for j in judgments))
+
+    def test_proposed_phrasing_contradicted_is_not_treated_as_assertion(self):
+        scenario = load_scenario("expert_hgf_met_direction_001")
+        claims = extract_claims(
+            'The proposed phrasing "HGF decreases MET signaling" is contradicted and unsupported by the evidence. The chatbot should avoid this phrasing.',
+            turn=4,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=scenario.target_mechanism_graphs,
+            traps=scenario.injected_traps,
+            turn_tags=["bad_assistant_answer_probe", "evaluator_fixture"],
+        )
+
+        self.assertFalse(any(j.error_type == "factual_inversion" for j in judgments))
+
     def test_supported_claim_not_forced_out_of_scope_by_focus_terms(self):
         scenario = load_scenario("expert_tam_cd8_immunosuppression_001")
         claims = extract_claims(

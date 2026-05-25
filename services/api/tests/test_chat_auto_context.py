@@ -350,6 +350,16 @@ class ChatAutoContextTests(unittest.TestCase):
                 "From now on, can you explain lung-cancer TME mechanisms?"
             )
         )
+        self.assertFalse(
+            _is_scope_or_memory_correction_only(
+                "Help me test whether a chatbot understands CAF-derived HGF and MET/c-MET signaling in lung cancer. Use cautious mechanistic language, not clinical treatment advice."
+            )
+        )
+        self.assertFalse(
+            _is_scope_or_memory_correction_only(
+                "For a multi-turn evaluation, give the careful biomedical framing for TME-only scope control across multi-turn conversation. Use cautious mechanistic language, not clinical treatment advice."
+            )
+        )
 
 
 if __name__ == "__main__":

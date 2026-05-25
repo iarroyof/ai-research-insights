@@ -95,7 +95,11 @@ class FakeContextPolicy:
         Capture.allow_web_search = allow_web_search
         return SimpleNamespace(
             turn_index=0,
-            context_prefix="",
+            context_prefix=(
+                "Privacy-filtered external biomedical grounding:\n- litsense2_sentence | PMID 123: external grounding snippet"
+                if allow_web_search
+                else ""
+            ),
             selected_context=[],
             retrieved_triplets=[],
             web_results=(
@@ -258,6 +262,7 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertTrue(Capture.allow_web_search)
         self.assertEqual(citations["memory"]["web_result_count"], 1)
         self.assertEqual(citations["web_context"][0]["title"], "DuckDuckGo abstract")
+        self.assertIn("Privacy-filtered external biomedical grounding", Capture.llm_messages[-1]["content"])
 
     def test_ambiguous_evidence_assembly_clarification_is_plain_answer_prefix(self):
         from app.routers.chat import _hold_generation_for_clarification, _opening_clarification_prefix

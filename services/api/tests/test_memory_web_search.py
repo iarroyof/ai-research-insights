@@ -337,6 +337,47 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([item["source"] for item in merged], ["pubmed", "litsense2_sentence", "pubtator3"])
 
+    def test_external_query_variants_translate_fungal_tumorigenesis_terms(self):
+        from app.memory.policy import _external_query_variants
+
+        variants = _external_query_variants(
+            "what fungi are described as playing essential roles in tumorigenesis and how it happens",
+            limit=3,
+        )
+        joined = " ".join(variants).lower()
+
+        self.assertGreaterEqual(len(variants), 2)
+        self.assertIn("mycobiome", joined)
+        self.assertIn("dysbiosis", joined)
+        self.assertIn("tumorigenesis", joined)
+
+    def test_external_query_variants_prioritize_candida_mechanism_bridge(self):
+        from app.memory.policy import _external_query_variants
+
+        variants = _external_query_variants("Is candida a fungi promoting tumorgenesis?", limit=4)
+        joined = " ".join(variants).lower()
+
+        self.assertIn("candida albicans promotes tumorigenesis", joined)
+        self.assertIn("pge2", joined)
+
+    def test_external_ranking_promotes_semantic_pubtator_title(self):
+        from app.memory.policy import _merge_external_results
+
+        merged = _merge_external_results(
+            [
+                {"source": "pmc", "pmid": "42148290", "title": "Microbial extracellular vesicles in the lung", "snippet": "Respiratory inflammation."},
+            ],
+            [
+                {"source": "pubtator3", "pmid": "34298645", "title": "Micro- and Mycobiota Dysbiosis in Pancreatic Ductal Adenocarcinoma Development", "snippet": "Micro- and Mycobiota Dysbiosis in Pancreatic Ductal Adenocarcinoma Development"},
+            ],
+            2,
+            [],
+            "what fungi are described as playing essential roles in tumorigenesis and how it happens",
+        )
+
+        self.assertEqual(merged[0]["pmid"], "34298645")
+        self.assertGreater(merged[0]["external_rank_score"], merged[1]["external_rank_score"])
+
 
 if __name__ == "__main__":
     unittest.main()

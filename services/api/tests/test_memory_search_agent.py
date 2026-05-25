@@ -608,6 +608,39 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("named candidate", assembly["prompt_context"].lower())
         self.assertIn("only supported evidence", assembly["prompt_context"].lower())
 
+    async def test_fungal_tumorigenesis_query_uses_mycobiome_bridge(self):
+        plan = await plan_auto_context(
+            message="what fungi are described as playing essential roles in tumorigenesis and how it happens",
+            selected_context_count=0,
+            notes=[],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        queries = " ".join(item.query.lower() for item in plan.variants)
+        self.assertEqual(plan.search_frame["frame"], "fungal_tumorigenesis")
+        self.assertIn("mycobiome", queries)
+        self.assertIn("tumorigenesis", queries)
+        self.assertIn("mechanism", queries)
+
+    async def test_bibliography_hit_feedback_is_rejected(self):
+        report = _feedback_term_report(
+            [
+                {
+                    "title": "Candida albicans tumorigenesis",
+                    "text": "Allemailem K. Alnuqaydan A. Almatroudi A. Alrumaihi F. Khalilullah H. Khan A. Safety and Therapeutic Efficacy Pharmaceutics 2021 13 677 10.3390/pharmaceutics13050677.",
+                }
+            ],
+            anchor_queries=["Candida albicans tumorigenesis"],
+        )
+
+        accepted = " ".join(report["accepted_terms"]).lower()
+        self.assertGreaterEqual(report["rejected_result_count"], 1)
+        self.assertNotIn("alnuqaydan", accepted)
+        self.assertNotIn("almatroudi", accepted)
+        self.assertNotIn("khan", accepted)
+
 
 if __name__ == "__main__":
     unittest.main()

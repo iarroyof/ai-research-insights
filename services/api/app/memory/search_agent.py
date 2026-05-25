@@ -31,7 +31,10 @@ NOISY_FEEDBACK_TERMS = {
     "effect", "modality", "modalities", "provide", "thus", "did",
     "physician", "noted", "talk", "patient", "patients", "correspondence",
     "latest", "start", "explaining", "explain", "candidate", "framework",
-    "frameworks", "suggested", "then", "year",
+    "frameworks", "suggested", "then", "year", "other", "also", "including",
+    "include", "includes", "essential", "play", "playing", "described",
+    "happen", "happens", "khan", "role", "roles", "microbe", "microbes",
+    "virus", "viruses", "bacteriophage", "bacteriophages", "bacteriopha",
     "cell", "cells", "tumor", "cancer", "carcinoma", "lung",
 }
 GENERIC_REFINEMENT_TERMS = {
@@ -58,6 +61,12 @@ STROMAL_ECM_BRIDGE = [
     "stromal fibroblast matrix stiffness invasion therapy resistance NSCLC",
 ]
 
+FUNGAL_TUMORIGENESIS_BRIDGE = [
+    "mycobiome mycobiota fungal dysbiosis cancer tumorigenesis mechanism",
+    "fungi tumor development oncogenesis inflammation immune modulation dysbiosis",
+    "Candida Malassezia pancreatic cancer colorectal cancer tumorigenesis inflammasome PGE2 complement",
+]
+
 MATH_PHARM_SYNERGY_TERMS = {
     "combination index", "ci value", "chou talalay", "dose response", "drug synergy",
     "therapeutic agent", "therapeutic agents", "combination therapy", "cytotoxicity",
@@ -79,6 +88,8 @@ def _domain_search_frame(message: str, notes: list[dict[str, Any]] | None = None
     synergy_context = "synergy" in text or "synerg" in text or "crosstalk" in text
     mechanistic_context = _contains_any(text, {"mechanistic", "mechanism", "pathway", "crosstalk", "interaction", "cooperative", "functional synergy", "pivot"})
     stromal_ecm_context = _contains_any(text, {"caf", "fibroblast", "ecm", "extracellular matrix", "matrix stiffness", "collagen", "crosslinking"})
+    fungal_context = _contains_any(text, {"fungi", "fungal", "fungus", "candida", "mycobiome", "mycobiota", "malassezia"})
+    tumorigenesis_context = _contains_any(text, {"tumorigenesis", "tumorgenesis", "oncogenesis", "carcinogenesis", "tumor development", "cancer development", "tumor growth"})
 
     preferred: list[str] = []
     avoid: list[str] = []
@@ -93,6 +104,9 @@ def _domain_search_frame(message: str, notes: list[dict[str, Any]] | None = None
     if stromal_ecm_context:
         frame = "stromal_ecm" if frame == "general_biomedical" else frame
         preferred.extend(STROMAL_ECM_BRIDGE)
+    if fungal_context and tumorigenesis_context:
+        frame = "fungal_tumorigenesis" if frame == "general_biomedical" else frame
+        preferred.extend(FUNGAL_TUMORIGENESIS_BRIDGE)
     if mechanistic_context and not asks_drug_synergy:
         avoid.extend(sorted(MATH_PHARM_SYNERGY_TERMS))
 
@@ -691,6 +705,8 @@ def _feedback_candidates(texts: list[str], limit: int) -> list[str]:
         cleaned = term.lower().strip()
         if cleaned in NOISY_FEEDBACK_TERMS:
             continue
+        if re.fullmatch(r"[a-z]{7,}", cleaned) and not set(important_terms(cleaned, 4)) & set(important_terms(" ".join(texts), 96)):
+            continue
         if cleaned.endswith(("ou", "ly")) and cleaned not in {"t cell"}:
             continue
         if len(cleaned) < 3:
@@ -708,6 +724,12 @@ def _feedback_candidates(texts: list[str], limit: int) -> list[str]:
 def _is_low_value_feedback_text(text: str, anchor_queries: list[str] | None = None) -> bool:
     lowered = (text or "").lower()
     if "correspondence" in lowered:
+        return True
+    author_initial_count = len(re.findall(r"\b[A-Z][a-z]{2,}\s+[A-Z]\.", text or ""))
+    citation_marker_count = len(re.findall(r"\b(?:doi|pmid|pharmaceutics|int\. j\.|j\.|vol\.|pp\.)\b|\b10\.\d{4,9}/", lowered))
+    if author_initial_count >= 4 or (author_initial_count >= 2 and citation_marker_count >= 1):
+        return True
+    if citation_marker_count >= 2 and len(re.findall(r"\b[a-z]{6,}\b", lowered)) >= 8:
         return True
     if "physician" in lowered and "noted" in lowered and _contains_any(lowered, {"talk", "patient", "risk", "benefit"}):
         return True
@@ -822,7 +844,8 @@ PUZZLE_NODE_STOP_TERMS = {
     "develop", "relating", "related", "relationship", "something", "else", "promotes",
     "promote", "environment", "question", "evidence", "mechanism", "pathway", "body",
     "latest", "start", "explain", "explaining", "conceptual", "then", "candidate",
-    "framework", "frameworks", "suggested",
+    "framework", "frameworks", "suggested", "described", "playing", "role",
+    "roles", "essential", "how", "happen", "happens",
 }
 
 

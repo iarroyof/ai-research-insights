@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
@@ -103,13 +104,17 @@ def _render_triplets(triplets: list[dict]) -> str:
 def _render_web(results: list[dict]) -> str:
     if not results:
         return ""
-    lines = ["Privacy-filtered external grounding:"]
+    lines = ["Privacy-filtered external biomedical grounding:"]
     for r in results[: settings.memory.web_k]:
         source = r.get("source") or "web"
         title = r.get("title") or "web result"
         snippet = r.get("snippet") or ""
         url = r.get("url") or ""
-        lines.append(f"- {source} | {title}: {snippet[:350]} {url}".strip())
+        pmid = r.get("pmid") or ""
+        pmcid = r.get("pmcid") or ""
+        provenance = " ".join(item for item in (f"PMID {pmid}" if pmid else "", f"PMCID {pmcid}" if pmcid else "") if item)
+        prefix = f"- {source}" + (f" | {provenance}" if provenance else "") + f" | {title}:"
+        lines.append(f"{prefix} {snippet[:520]} {url}".strip())
     return "\n".join(lines)
 
 
@@ -117,22 +122,94 @@ def _external_result_key(result: dict) -> str:
     return str(result.get("pmid") or result.get("pmcid") or result.get("url") or result.get("title") or "")
 
 
+def _external_query_variants(query: str, limit: int = 3) -> list[str]:
+    """Build privacy-safe biomedical query bridges for external literature search.
+
+    The bridges are not answer rules. They translate user vocabulary into common
+    literature vocabulary when exact local terms are too sparse.
+    """
+    text = (query or "").lower()
+    variants = [query]
+    fungal = any(term in text for term in ("fungi", "fungal", "fungus", "candida", "mycobiome", "mycobiota", "malassezia"))
+    tumor = any(term in text for term in ("tumor", "tumour", "cancer", "oncogenesis", "carcinogenesis", "tumorigenesis", "tumorgenesis"))
+    if fungal and tumor:
+        variants.extend(
+            [
+                "Malassezia pancreatic cancer mycobiome MBL complement tumorigenesis",
+                "mycobiome mycobiota fungal dysbiosis cancer tumorigenesis mechanism",
+                "fungi tumor development oncogenesis inflammation immune modulation dysbiosis",
+            ]
+        )
+        if "candida" in text:
+            variants[1:1] = [
+                "Candida albicans promotes tumorigenesis cancer inflammasome",
+                "Candida albicans PGE2 cancer inflammation tumor development",
+            ]
+    if re.search(r"\bp\s*h\b|\bph\b", text) and tumor:
+        variants.append("acidic tumor microenvironment lactate acidosis diet metabolism cancer development")
+    if any(term in text for term in ("food habit", "diet", "dietary", "nutrition")) and tumor:
+        variants.append("dietary factors metabolism microbiome inflammation cancer risk tumor microenvironment")
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for item in variants:
+        cleaned = " ".join(str(item or "").split())[:220]
+        key = cleaned.lower()
+        if cleaned and key not in seen:
+            seen.add(key)
+            deduped.append(cleaned)
+        if len(deduped) >= max(1, limit):
+            break
+    return deduped
+
+
+def _expanded_external_query_terms(query: str) -> set[str]:
+    terms_set = set(important_terms(query, 64))
+    text = (query or "").lower()
+    if any(term in text for term in ("fungi", "fungal", "fungus")):
+        terms_set.update({"fungal", "fungi", "mycobiome", "mycobiota", "candida", "malassezia"})
+    if "candida" in text:
+        terms_set.update({"candida", "albicans", "pge2", "inflammasome", "inflammation"})
+    if any(term in text for term in ("tumorigenesis", "tumorgenesis", "oncogenesis", "carcinogenesis")):
+        terms_set.update({"tumor", "cancer", "development", "oncogenesis", "carcinogenesis", "tumorigenesis"})
+    if any(term in text for term in ("how", "mechanism", "happens")):
+        terms_set.update({"mechanism", "inflammation", "immune", "dysbiosis", "metabolism"})
+    return terms_set
+
+
 def _rank_external_results(query: str, results: list[dict]) -> list[dict]:
-    query_terms = set(important_terms(query, 48))
+    query_terms = _expanded_external_query_terms(query)
     if not query_terms:
         return results
 
     def score(result: dict) -> tuple[float, float]:
-        text_terms = set(important_terms(f"{result.get('title') or ''} {result.get('snippet') or ''}", 140))
+        source = str(result.get("source") or "")
+        title_terms = set(important_terms(str(result.get("title") or ""), 80))
+        snippet_terms = set(important_terms(str(result.get("snippet") or ""), 160))
+        text_terms = title_terms | snippet_terms
         overlap = len(query_terms & text_terms) / max(1, len(query_terms))
-        semantic = 0.1 if str(result.get("source") or "").startswith("litsense2") else 0.0
+        title_overlap = len(query_terms & title_terms) / max(1, min(len(query_terms), 12))
+        semantic = 0.0
+        if source.startswith("litsense2"):
+            semantic += 0.16
+        elif source == "pubtator3":
+            semantic += 0.12
+        elif source in {"pubmed", "pmc"}:
+            semantic += 0.04
+        if result.get("pmid") or result.get("pmcid"):
+            semantic += 0.04
+        query_text = (query or "").lower()
+        result_text = f"{result.get('title') or ''} {result.get('snippet') or ''}".lower()
+        if any(term in query_text for term in ("fungi", "fungal", "fungus", "mycobiome", "mycobiota", "candida", "malassezia")):
+            if not any(term in result_text for term in ("fung", "mycobi", "candida", "malassezia", "mbl", "mannose-binding lectin")):
+                semantic -= 0.25
         provider_score = float(result.get("score", 0.0) or 0.0)
-        return overlap + semantic, provider_score
+        return overlap + (0.45 * title_overlap) + semantic, provider_score
 
     ranked = [dict(result) for result in results]
     ranked.sort(key=score, reverse=True)
     for result in ranked:
-        result.setdefault("external_rank_score", round(score(result)[0], 4))
+        result["external_rank_score"] = round(score(result)[0], 4)
     return ranked
 
 
@@ -147,15 +224,22 @@ def _merge_external_results(
     pubmed_results = _rank_external_results(query, pubmed_results)
     pubtator_results = _rank_external_results(query, pubtator_results)
     litsense_results = _rank_external_results(query, litsense_results)
-    auxiliary_result_sets = [items for items in (litsense_results, pubtator_results) if items]
-    reserved_auxiliary_slots = min(len(auxiliary_result_sets), max(0, k - (1 if pubmed_results else 0)))
-    keep_pubmed = max(0, k - reserved_auxiliary_slots)
-    candidates = [
-        *pubmed_results[:keep_pubmed],
-        *litsense_results,
-        *pubtator_results,
-        *pubmed_results[keep_pubmed:],
-    ]
+    if not query:
+        auxiliary_result_sets = [items for items in (litsense_results, pubtator_results) if items]
+        reserved_auxiliary_slots = min(len(auxiliary_result_sets), max(0, k - (1 if pubmed_results else 0)))
+        keep_pubmed = max(0, k - reserved_auxiliary_slots)
+        candidates = [
+            *pubmed_results[:keep_pubmed],
+            *litsense_results,
+            *pubtator_results,
+            *pubmed_results[keep_pubmed:],
+        ]
+    else:
+        candidates = [*litsense_results, *pubtator_results, *pubmed_results]
+        candidates.sort(
+            key=lambda item: (float(item.get("external_rank_score", 0.0) or 0.0), float(item.get("score", 0.0) or 0.0)),
+            reverse=True,
+        )
     merged: list[dict] = []
     seen: set[str] = set()
     for result in candidates:
@@ -188,7 +272,8 @@ def _policy_instruction() -> str:
     return (
         "Memory policy guidance:\n"
         "- Treat the context below as an OS-like working set selected from recent turns, indexed memory, landmarks, triplets, and optional web grounding.\n"
-        "- Prefer facts supported by pinned snippets, retrieved triplets, or explicit user statements.\n"
+        "- Prefer facts supported by pinned snippets, retrieved triplets, privacy-filtered external biomedical grounding, or explicit user statements.\n"
+        "- When local snippets are sparse but external PubMed/PMC/LitSense/PubTator grounding is present, use it with provenance and caveats instead of saying no context exists.\n"
         "- If a warning says facts may be inconsistent, briefly mention the uncertainty and ask the user which fact should be treated as authoritative.\n"
         "- Do not expose hidden reward scores or policy internals unless the user asks for diagnostics."
     )
@@ -244,18 +329,34 @@ class ContextPolicy:
             pubmed_payload = {"results": [], "query": "", "redacted": False}
             pubtator_payload = {"results": [], "query": "", "redacted": False}
             litsense_payload = {"results": [], "query": "", "redacted": False}
-            try:
-                pubmed_payload = await pubmed_pmc_search(message, settings.memory.web_k)
-            except Exception as e:
-                print(f"[WARN] ContextPolicy PubMed/PMC search failed: {e}")
-            try:
-                pubtator_payload = await pubtator3_search(message, settings.memory.web_k)
-            except Exception as e:
-                print(f"[WARN] ContextPolicy PubTator 3 search failed: {e}")
-            try:
-                litsense_payload = await litsense2_search(message, settings.memory.web_k)
-            except Exception as e:
-                print(f"[WARN] ContextPolicy LitSense 2.0 search failed: {e}")
+            external_queries = _external_query_variants(message, limit=4)
+            pubmed_results: list[dict] = []
+            pubtator_results: list[dict] = []
+            litsense_results: list[dict] = []
+            for external_query in external_queries:
+                remaining = max(1, settings.memory.web_k - len(pubmed_results))
+                try:
+                    payload = await pubmed_pmc_search(external_query, remaining)
+                    pubmed_payload = payload if not pubmed_payload.get("query") else pubmed_payload
+                    pubmed_results.extend(payload.get("results") or [])
+                except Exception as e:
+                    print(f"[WARN] ContextPolicy PubMed/PMC search failed: {e}")
+                remaining = max(1, settings.memory.web_k - len(pubtator_results))
+                try:
+                    payload = await pubtator3_search(external_query, remaining)
+                    pubtator_payload = payload if not pubtator_payload.get("query") else pubtator_payload
+                    pubtator_results.extend(payload.get("results") or [])
+                except Exception as e:
+                    print(f"[WARN] ContextPolicy PubTator 3 search failed: {e}")
+                remaining = max(1, settings.memory.web_k - len(litsense_results))
+                try:
+                    payload = await litsense2_search(external_query, remaining)
+                    litsense_payload = payload if not litsense_payload.get("query") else litsense_payload
+                    litsense_results.extend(payload.get("results") or [])
+                except Exception as e:
+                    print(f"[WARN] ContextPolicy LitSense 2.0 search failed: {e}")
+                if len(pubmed_results) + len(pubtator_results) + len(litsense_results) >= settings.memory.web_k * 3:
+                    break
 
             web_payload = (
                 pubmed_payload
@@ -265,10 +366,10 @@ class ContextPolicy:
                 else pubtator_payload
             )
             web_payload["results"] = _merge_external_results(
-                pubmed_payload.get("results") or [],
-                pubtator_payload.get("results") or [],
+                pubmed_results,
+                pubtator_results,
                 settings.memory.web_k,
-                litsense_payload.get("results") or [],
+                litsense_results,
                 message,
             )
             if not web_payload.get("results"):

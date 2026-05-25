@@ -624,7 +624,8 @@ async def chat(req: Request, body: ChatRequest):
             {
                 "role": "system",
                 "content": (
-                    "You are a helpful research assistant. Answer based on the provided context. "
+                    "You are a helpful research assistant. Answer based on the provided context, including numbered snippets, memory context, and privacy-filtered external biomedical grounding. "
+                    "If local snippets are too sparse but external PubMed/PMC/LitSense/PubTator grounding is supplied, use the external grounding with provenance and explicit caveats. "
                     "Do not add outside biomedical mechanisms, examples, mediators, therapies, or pathway steps "
                     "when the supplied context does not directly support them. If a relation is only plausible "
                     "from general knowledge, label it as not supported by the supplied context instead of explaining it as true. "

@@ -29,7 +29,7 @@ ENTITY_ALIASES = {
 PREDICATES = {
     "activates": ["activates", "activate", "increases", "promotes", "stimulates"],
     "decreases": ["decrease", "decreases", "reduce", "reduces", "block", "blocks", "suppress", "suppresses", "inhibit", "inhibits"],
-    "contributes_to": ["contributes", "drives", "supports", "promotes", "causes"],
+    "contributes_to": ["contributes", "contribute", "drives", "supports", "promotes", "causes", "leads", "lead", "linked", "link"],
     "irrelevant": ["irrelevant", "not needed", "unnecessary"],
 }
 
@@ -45,7 +45,7 @@ def extract_claims(answer: str, *, turn: int) -> list[ExtractedClaim]:
         lowered = sentence.lower()
         if sentence.endswith("?") and (len(sentence.split()) <= 16 or "treated as authoritative" in lowered or "guide the benchmark" in lowered):
             continue
-        if lowered.startswith(("please clarify", "would you like")):
+        if lowered.startswith(("please clarify", "would you like", "let me know")):
             continue
         entities = _entities(sentence)
         if not entities and len(sentence.split()) < 6:

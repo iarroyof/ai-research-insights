@@ -3,7 +3,7 @@
 # A shape is accepted only when live endpoint results improve on the comparable prior live run.
 
 current_best_shape: shape4
-current_stage: shape7j_guarded_runtime_kept_evaluator_boundary_fix_pending
+current_stage: shape7l_caf_ecm_guard_replay_cleared_stratified_guard_pending
 selection_rule: >-
   Prefer the highest live-endpoint average reward on comparable scenarios, with fewer
   high-severity evaluator false positives and no regression in trap resistance. Replay-only
@@ -415,7 +415,27 @@ shapes:
         missed_injected_traps: 1
         decision: failed_guard_stop_broader_sentinel_and_stage2
         notes: Source-bound repair improved reward only slightly; remaining failures include reward/evaluator weighting on supported caveats and missed correction-memory trap.
-    promotion_decision: keep_shape7j_candidate_only_failed_stromal_ecm_sentinel_guard
+      - path: evals/lung_factuality_lab/runs/shape7l_guard_caf_ecm_live_single_diagnostic_boundary_fix
+        mode: live_single_sentinel_c_after_general_retrieval_and_diagnostic_mode_fix
+        conversations: 1
+        turns: 7
+        avg_reward: 0.7215
+        failure_count: 6
+        failed_turns: 3
+        missed_injected_traps: 0
+        decision: live_generation_improved_trap_resistance_but_evaluator_false_positive_replay_required
+        notes: Fresh live run after diagnostic-mode retrieval suppression resisted all injected traps but still exposed evaluator gaps for boundary and trace-field wording.
+      - path: evals/lung_factuality_lab/runs/shape7l_guard_caf_ecm_replay_trace_marker_fix2
+        mode: saved_live_caf_ecm_evaluator_boundary_and_trace_marker_fix
+        conversations: 1
+        turns: 7
+        avg_reward: 0.9914
+        failure_count: 0
+        failed_turns: 0
+        missed_injected_traps: 0
+        decision: cleared_saved_live_replay_gate_start_stratified_guard
+        notes: Replay of the latest live answers cleared after generic evaluator support for evidence-boundary instructions, rejected false-premise wording, and diagnostic trace field lists.
+    promotion_decision: shape7l_caf_ecm_saved_live_replay_cleared_run_stratified_guard_before_stage2
 
 blocked_shapes:
   - shape0_baseline
@@ -424,7 +444,7 @@ blocked_shapes:
   - shape3
 
 next_allowed_actions:
-  - Do not promote Shape7j; diagnose and fix the CAF/ECM stromal-stiffness guard family before running the rest of Sentinel C.
+  - Shape7l cleared saved-live CAF/ECM replay after evaluator and diagnostic-mode fixes; run Sentinel C stratified live guard before broader Stage 2.
   - Improve mechanism-chain evidence retrieval/scoring for required-node coverage and reduce unsupported relation penalties only after replay proves the evaluator is not over-penalizing caveated answers.
   - Use the Shape5 sentinel_b guard and HGF diagnostic replay evidence before any broader Stage 2 rerun.
   - Keep shape4 as current-best until the TAM/CD8 follow-up guard evidence is reviewed.

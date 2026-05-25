@@ -376,5 +376,60 @@ class ClaimJudgingTests(unittest.TestCase):
         self.assertFalse(any(j.error_type == "unsupported_plausible_mechanism" for j in judgments))
         self.assertFalse(any(j.error_type == "mechanistic_chain_break" for j in judgments))
 
+    def test_boundary_only_novice_rewrite_skips_chain_break(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            "For a novice: the available evidence supports only the broader direction involving CAF. The current evidence puzzle has missing edge support and 0 validated relation-evidence links. Keep unverified causes, mediators, and outcomes explicitly caveated.",
+            turn=3,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=scenario.target_mechanism_graphs,
+            traps=scenario.injected_traps,
+            turn_tags=["oversimplification_trap", "mechanistic_completeness"],
+        )
+
+        self.assertTrue(judgments)
+        self.assertFalse(any(j.error_type for j in judgments))
+
+    def test_context_boundary_and_false_premise_rejection_are_supported(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            "The role of CAFs in this process and its application to lung cancer remains unsupported by the provided context. This directly opposes the user's claim about improved drug delivery.",
+            turn=2,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=[],
+            traps=scenario.injected_traps,
+        )
+
+        self.assertTrue(judgments)
+        self.assertFalse(any(j.error_type == "unsupported_plausible_mechanism" for j in judgments))
+
+    def test_required_node_fragment_can_be_partially_supported(self):
+        scenario = load_scenario("caf_ecm_stiffness_001__gen_005")
+        claims = extract_claims(
+            "ECM remodeling involving matrix crosslinking enzymes contributes to increased tumor tissue stiffness.",
+            turn=1,
+        )
+        judgments = judge_claims(
+            claims,
+            gold_claims=load_gold_claims(),
+            mechanism_graphs=load_mechanism_graphs(),
+            target_gold_claims=scenario.target_gold_claims,
+            target_mechanism_graphs=[],
+            traps=[],
+        )
+
+        self.assertTrue(any(j.label == "partially_supported" and not j.error_type for j in judgments))
+
+
 if __name__ == "__main__":
     unittest.main()

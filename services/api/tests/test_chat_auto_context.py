@@ -213,6 +213,30 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertIn("plausible", Capture.llm_messages[0]["content"])
         self.assertIn("missing evidence", Capture.llm_messages[0]["content"])
 
+
+    def test_diagnostic_trace_mode_skips_auto_context_and_extra_retrieval(self):
+        with patch("app.routers.chat.build_auto_context", side_effect=fake_build_auto_context), patch(
+            "app.routers.chat.build_prompt_and_citations", side_effect=fake_build_prompt_and_citations
+        ), patch("app.routers.chat.ContextPolicy", FakeContextPolicy), patch("app.routers.chat.LLMClient", FakeLLMClient):
+            response = self.client.post(
+                "/chat/",
+                headers=self.headers,
+                json={
+                    "message": "If the evaluator disagrees with the chatbot, what trace evidence should the agent inspect before changing code?",
+                    "items": [],
+                    "options": {"allow_memory": True, "allow_auto_context": True, "allow_extra_retrieval": True, "allow_web_search": True},
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        events = self._events(response)
+        citations = next(item["data"] for item in events if item["type"] == "citations")
+        self.assertFalse(Capture.auto_called)
+        self.assertFalse(Capture.options["allow_extra_retrieval"])
+        self.assertFalse(Capture.allow_web_search)
+        self.assertEqual(citations["generation_telemetry"]["answer_mode"], "diagnostic_trace_answer")
+        self.assertIn("source sentence IDs", "\n".join(m["content"] for m in Capture.llm_messages))
+
     def test_answer_mode_detector_selects_mode_contracts(self):
         from app.routers.chat import _answer_mode, _post_generation_expansion_guard
 

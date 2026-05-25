@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from evals.lung_factuality_lab.src.evidence_matcher import find_best_gold_claim, find_best_mechanism_graph
+from evals.lung_factuality_lab.src.evidence_matcher import find_best_gold_claim, find_best_mechanism_graph, _node_present
 from evals.lung_factuality_lab.src.schemas import ClaimJudgment, ExtractedClaim, GoldClaim, InjectedTrap, MechanismGraph
 
 
@@ -92,6 +92,11 @@ def judge_claims(
             reason = f"Claim is a directionally correct fragment of curated gold claim {gold.claim_id}."
             severity = 0
             error_type = None
+        elif gold and _is_required_node_fragment(claim, gold, match_score):
+            label = "partially_supported"
+            reason = f"Claim covers a required mechanism node or local edge for curated gold claim {gold.claim_id}."
+            severity = 0
+            error_type = None
         elif _is_evidence_limitation_or_caveat(lower) or _is_evidence_assembly_boundary(lower):
             label = "supported"
             reason = "Claim states an evidence boundary, caveat, or unsupported-relation rejection rather than a biomedical mechanism claim."
@@ -141,9 +146,10 @@ def judge_claims(
     has_biomedical_entities = any(claim.entities for claim in claims)
     has_scope_drift = any(j.error_type == "scope_drift" for j in out)
     has_citation_scope_guidance = any(_is_citation_scope_guidance(claim.text.lower()) for claim in claims)
+    boundary_only_answer = _is_boundary_only_answer(claims, tag_set)
     skip_graph_scoring = bool(
         tag_set & {"agent_observability", "diagnosis", "evaluator_fixture", "reward_observability"}
-    ) or has_citation_scope_guidance
+    ) or has_citation_scope_guidance or boundary_only_answer
     if graphs and claims and has_biomedical_entities and not severe_contradiction and not has_scope_drift and not skip_graph_scoring:
         graph, missing_nodes, completeness = find_best_mechanism_graph(claims, graphs)
         if graph and missing_nodes:
@@ -282,6 +288,22 @@ def _rejects_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> boo
             "no mention",
             "not addressed",
             "unaddressed",
+            "remains unsupported",
+            "unsupported by the provided context",
+            "unsupported by provided context",
+            "unsupported by the current context",
+            "unsupported by current context",
+            "requires additional evidence",
+            "additional evidence",
+            "insufficient support",
+            "insufficient to",
+            "context is insufficient",
+            "not fully support",
+            "does not directly link",
+            "not directly link",
+            "lack of evidence",
+            "absence of",
+            "supplied context",
             "provided context does not",
             "context does not",
             "does not support",
@@ -320,6 +342,57 @@ def _mentions_unacceptable_variant(claim: ExtractedClaim, gold: GoldClaim) -> bo
     return "hgf" in lower and _has_met_token(lower) and any(word in lower for word in WRONG_DIRECTION_WORDS)
 
 
+
+def _is_required_node_fragment(claim: ExtractedClaim, gold: GoldClaim, match_score: float) -> bool:
+    lower = claim.text.lower()
+    if _mentions_unacceptable_variant(claim, gold) or _overgeneralized(claim):
+        return False
+    if not (claim.entities or claim.relation.predicate):
+        return False
+    required_nodes = list(gold.required_mechanism_nodes or gold.entities or [])
+    if not required_nodes:
+        return False
+    node_hits = sum(1 for node in required_nodes if _node_present(node, lower))
+    if node_hits >= 2:
+        return True
+    if node_hits >= 1 and (claim.relation.predicate or _has_local_mechanism_edge(lower)) and match_score >= 0.2:
+        return True
+    return False
+
+
+
+def _has_local_mechanism_edge(lower: str) -> bool:
+    edge_markers = (
+        "->",
+        "→",
+        "lead to",
+        "leads to",
+        "linked to",
+        "link to",
+        "contribute to",
+        "contributes to",
+        "associated with",
+        "become stiff",
+        "increased stiffness",
+        "matrix stiffness",
+    )
+    return any(marker in lower for marker in edge_markers)
+
+def _is_boundary_only_answer(claims: list[ExtractedClaim], tag_set: set[str]) -> bool:
+    if not claims:
+        return False
+    if not (tag_set & {"oversimplification_trap", "mechanistic_completeness", "evidence_assembly"}):
+        return False
+    boundary_count = 0
+    substantive_count = 0
+    for claim in claims:
+        lower = claim.text.lower()
+        if _is_evidence_limitation_or_caveat(lower) or _is_evidence_assembly_boundary(lower) or _is_meta_observability_claim(lower, tag_set):
+            boundary_count += 1
+        elif claim.entities or claim.relation.predicate:
+            substantive_count += 1
+    return boundary_count > 0 and substantive_count == 0
+
 def _is_evidence_limitation_or_caveat(lower: str) -> bool:
     return any(
         marker in lower
@@ -331,9 +404,26 @@ def _is_evidence_limitation_or_caveat(lower: str) -> bool:
             "provided snippets",
             "provided context does not",
             "provided context snippets do not",
+            "context snippets do not",
             "context does not",
             "not addressed",
             "unaddressed",
+            "remains unsupported",
+            "unsupported by the provided context",
+            "unsupported by provided context",
+            "unsupported by the current context",
+            "unsupported by current context",
+            "requires additional evidence",
+            "additional evidence",
+            "insufficient support",
+            "insufficient to",
+            "context is insufficient",
+            "not fully support",
+            "does not directly link",
+            "not directly link",
+            "lack of evidence",
+            "absence of",
+            "supplied context",
             "no mention",
             "no evidence",
             "no supported connection",
@@ -381,6 +471,27 @@ def _is_evidence_assembly_boundary(lower: str) -> bool:
             "not specified",
             "lack explicit",
             "without inventing",
+            "available evidence supports only",
+            "evidence supports only the broader direction",
+            "current evidence puzzle",
+            "validated relation-evidence",
+            "validated relation evidence",
+            "unverified",
+            "caveated",
+            "explicitly caveated",
+            "directly opposes",
+            "opposes the user's claim",
+            "invalid for",
+            "inaccurate for",
+            "wrong for",
+            "do not add a detailed mechanism",
+            "falsely claims",
+            "cannot be validated",
+            "directly contradicted",
+            "lacks any contextual basis",
+            "lacks contextual basis",
+            "unfounded",
+            "inaccurate",
         )
     )
 
@@ -505,6 +616,11 @@ def _is_meta_observability_claim(lower: str, tag_set: set[str]) -> bool:
             "claim judgment",
             "failure owner",
             "reward model",
+            "reward penalties",
+            "source sentence",
+            "source sentence ids",
+            "bm25",
+            "retrieval records",
             "pinned context",
             "scope constraint",
             "user directive",

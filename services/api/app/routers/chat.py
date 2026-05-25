@@ -182,6 +182,8 @@ ANSWER_MODE_CONTRACTS: Dict[str, str] = {
     "phrase_evaluation": "Judge the proposed wording first as supported, unsupported, contradicted, or too broad; do not answer a stale prior topic.",
     "diagnostic_trace_answer": (
         "Answer about trace/evaluator evidence using diagnostic fields, not biomedical inference. "
+        "Do not retrieve or discuss unrelated biomedical snippets for this mode. "
+        "Name the trace fields the developer should inspect: user turn, expected behavior, extracted claims, claim judgments, source sentence IDs, BM25/retrieval records, evidence puzzle, answer mode, reward penalties, failure owner, and recommendations. "
         "If the user references a correction, preserve that correction and do not reverse a prior false-premise rejection."
     ),
     "correction_acknowledgement": "Acknowledge the user correction and update scope without adding new evidence claims.",
@@ -507,6 +509,9 @@ async def chat(req: Request, body: ChatRequest):
     started_at = time.monotonic()
     correction_only_turn = _is_scope_or_memory_correction_only(body.message)
     
+    preliminary_answer_mode = _answer_mode(body.message, {}, correction_only_turn=correction_only_turn)
+    diagnostic_or_correction_mode = preliminary_answer_mode in {"diagnostic_trace_answer", "correction_acknowledgement"}
+
     # Resolve pinned selections to exact snippets
     pinned_items = []
     if body.items:
@@ -527,6 +532,7 @@ async def chat(req: Request, body: ChatRequest):
         and body.options.allow_auto_context
         and settings.memory.auto_context_enabled
         and not correction_only_turn
+        and not diagnostic_or_correction_mode
     ):
         try:
             auto_payload = await build_auto_context(
@@ -552,7 +558,7 @@ async def chat(req: Request, body: ChatRequest):
     if build_prompt_and_citations:
         # Use advanced builder - pass options as a dict
         options_dict = {
-            "allow_extra_retrieval": bool(body.options.allow_extra_retrieval and not auto_context_snippets),
+            "allow_extra_retrieval": bool(body.options.allow_extra_retrieval and not auto_context_snippets and not diagnostic_or_correction_mode),
             "token_budget_ratio": settings.memory.token_budget_ratio,
             "include_spo_when_available": True,
         }
@@ -580,7 +586,7 @@ async def chat(req: Request, body: ChatRequest):
     if evidence_assembly_context:
         prompt = f"{evidence_assembly_context}\n\nGrounded task prompt:\n{prompt}"
     active_evidence_assembly = (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
-    answer_mode = _answer_mode(body.message, active_evidence_assembly, correction_only_turn=correction_only_turn)
+    answer_mode = preliminary_answer_mode if diagnostic_or_correction_mode else _answer_mode(body.message, active_evidence_assembly, correction_only_turn=correction_only_turn)
     answer_mode_contract = ANSWER_MODE_CONTRACTS.get(answer_mode, ANSWER_MODE_CONTRACTS["direct_answer"])
     answer_mode_context = _answer_mode_prompt(answer_mode, active_evidence_assembly)
     if not correction_only_turn:
@@ -599,7 +605,7 @@ async def chat(req: Request, body: ChatRequest):
         context_plan = await policy.plan(
             session_id=session_id,
             message=body.message,
-            allow_web_search=bool(allow_web),
+            allow_web_search=bool(allow_web and not diagnostic_or_correction_mode),
             confidence_min=body.options.confidence_min,
         )
         if context_plan.context_prefix:

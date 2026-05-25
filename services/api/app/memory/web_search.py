@@ -107,6 +107,16 @@ async def _eutils_fetch_xml(client: httpx.AsyncClient, *, db: str, ids: List[str
     return resp.text
 
 
+async def pubmed_fetch_by_pmids(pmids: List[str]) -> Dict[str, Dict[str, str]]:
+    """Fetch PubMed abstracts for known PMIDs without sending a new text query."""
+    ids = [str(item).strip() for item in pmids if str(item).strip()]
+    if not ids:
+        return {}
+    async with httpx.AsyncClient(timeout=12) as client:
+        xml_text = await _eutils_fetch_xml(client, db="pubmed", ids=ids[:20])
+    return {str(item.get("pmid") or ""): item for item in _pubmed_results_from_xml(xml_text)}
+
+
 async def pubmed_pmc_search(query: str, k: int | None = None) -> Dict[str, Any]:
     """
     Privacy-filtered PubMed then PMC lookup through NCBI E-utilities.

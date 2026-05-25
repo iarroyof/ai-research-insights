@@ -186,9 +186,9 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         )
         joined = " ".join(item.query.lower() for item in variants)
 
-        self.assertEqual(frame["frame"], "mechanistic_tme_synergy")
-        self.assertIn("mechanistic synergy", joined)
-        self.assertIn("crosstalk", joined)
+        self.assertEqual(frame["frame"], "mechanism_or_pathway")
+        self.assertIn("functional synergy", joined)
+        self.assertIn("aggressive lung", joined)
         self.assertIn("combination index", frame["avoid_terms"])
 
     def test_current_query_prevents_stale_tme_note_from_forcing_fungal_analogy_frame(self):
@@ -197,8 +197,8 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
             notes=[{"note": "Use TME tumor microenvironment growth bridge terms for the prior lung cancer turn."}],
         )
 
-        self.assertEqual(frame["frame"], "general_biomedical")
-        self.assertEqual(frame["preferred_queries"], [])
+        self.assertEqual(frame["frame"], "cross_domain_or_analogy")
+        self.assertIn("cancer", " ".join(frame["preferred_queries"]).lower())
 
     def test_feedback_terms_filter_caption_noise_and_keep_domain_terms(self):
         terms = _feedback_terms_from_results(
@@ -608,7 +608,7 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("named candidate", assembly["prompt_context"].lower())
         self.assertIn("only supported evidence", assembly["prompt_context"].lower())
 
-    async def test_fungal_tumorigenesis_query_uses_mycobiome_bridge(self):
+    async def test_entity_mechanism_query_uses_generic_task_bridge(self):
         plan = await plan_auto_context(
             message="what fungi are described as playing essential roles in tumorigenesis and how it happens",
             selected_context_count=0,
@@ -619,8 +619,8 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         queries = " ".join(item.query.lower() for item in plan.variants)
-        self.assertEqual(plan.search_frame["frame"], "fungal_tumorigenesis")
-        self.assertIn("mycobiome", queries)
+        self.assertEqual(plan.search_frame["frame"], "mechanism_or_pathway")
+        self.assertIn("fungi", queries)
         self.assertIn("tumorigenesis", queries)
         self.assertIn("mechanism", queries)
 

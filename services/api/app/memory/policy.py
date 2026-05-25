@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -13,9 +14,10 @@ from app.memory.claims import extract_atomic_claims
 from app.memory.consistency import longitudinal_consistency_report, render_conversation_frame
 from app.memory.evidence import evidence_to_dicts, gather_evidence_candidates
 from app.memory.nli import score_answer_triples
+from app.memory.idea_index import extract_ideas, normalize_idea
 from app.memory.rewards import detect_triplet_conflicts, important_terms, reward_report, terms
 from app.memory.store import MemoryStore
-from app.memory.web_search import duckduckgo_search, litsense2_search, pubmed_pmc_search, pubtator3_search
+from app.memory.web_search import duckduckgo_search, litsense2_search, pubmed_fetch_by_pmids, pubmed_pmc_search, pubtator3_search
 
 try:
     from app.integrations.extraction_client import extract_triples
@@ -122,38 +124,64 @@ def _external_result_key(result: dict) -> str:
     return str(result.get("pmid") or result.get("pmcid") or result.get("url") or result.get("title") or "")
 
 
-def _external_query_variants(query: str, limit: int = 3) -> list[str]:
-    """Build privacy-safe biomedical query bridges for external literature search.
+def _compact_text(value: str, limit: int = 220) -> str:
+    return " ".join(str(value or "").split())[:limit]
 
-    The bridges are not answer rules. They translate user vocabulary into common
-    literature vocabulary when exact local terms are too sparse.
-    """
+
+def _policy_query_terms(query: str, limit: int = 18) -> list[str]:
+    noisy = {
+        "what", "which", "how", "why", "does", "described", "describe", "playing",
+        "role", "roles", "essential", "happen", "happens", "something", "else",
+        "relationship", "relating", "related", "develop", "provide", "explain",
+    }
+    out: list[str] = []
+    for term in important_terms(query, limit * 2):
+        cleaned = str(term or "").strip().lower()
+        if not cleaned or cleaned in noisy or len(cleaned) < 3:
+            continue
+        out.append(term)
+        if len(out) >= limit:
+            break
+    return list(dict.fromkeys(out))
+
+
+def _policy_task_terms(query: str) -> list[str]:
     text = (query or "").lower()
-    variants = [query]
-    fungal = any(term in text for term in ("fungi", "fungal", "fungus", "candida", "mycobiome", "mycobiota", "malassezia"))
-    tumor = any(term in text for term in ("tumor", "tumour", "cancer", "oncogenesis", "carcinogenesis", "tumorigenesis", "tumorgenesis"))
-    if fungal and tumor:
-        variants.extend(
-            [
-                "Malassezia pancreatic cancer mycobiome MBL complement tumorigenesis",
-                "mycobiome mycobiota fungal dysbiosis cancer tumorigenesis mechanism",
-                "fungi tumor development oncogenesis inflammation immune modulation dysbiosis",
-            ]
-        )
-        if "candida" in text:
-            variants[1:1] = [
-                "Candida albicans promotes tumorigenesis cancer inflammasome",
-                "Candida albicans PGE2 cancer inflammation tumor development",
-            ]
-    if re.search(r"\bp\s*h\b|\bph\b", text) and tumor:
-        variants.append("acidic tumor microenvironment lactate acidosis diet metabolism cancer development")
-    if any(term in text for term in ("food habit", "diet", "dietary", "nutrition")) and tumor:
-        variants.append("dietary factors metabolism microbiome inflammation cancer risk tumor microenvironment")
+    out: list[str] = []
+    if any(marker in text for marker in ("how", "why", "mechanism", "pathway", "happen")):
+        out.extend(["mechanism", "pathogenesis", "signaling", "immune", "inflammation", "metabolism"])
+    if any(marker in text for marker in ("what", "which", "specific", "particular", "described", "reported")):
+        out.extend(["examples", "specific", "species", "organisms", "reported", "review"])
+    if any(marker in text for marker in ("evidence", "study", "paper", "trial")):
+        out.extend(["evidence", "study", "review"])
+    if any(marker in text for marker in ("compare", "versus", " vs ")):
+        out.extend(["comparison", "difference"])
+    return list(dict.fromkeys(out))[:12]
+
+
+def _external_query_variants(query: str, limit: int = 4) -> list[str]:
+    """Build generic privacy-safe biomedical query bridges for external literature search.
+
+    This intentionally avoids topic-specific expansions. It preserves user terms,
+    adds normalized concepts, and adds task words such as mechanism/evidence when
+    the user asks for mechanisms, examples, or support.
+    """
+    anchors = _policy_query_terms(query)
+    normalized = [normalize_idea(item) for item in extract_ideas(query, limit=8)]
+    normalized = [item for item in normalized if item]
+    task_terms = _policy_task_terms(query)
+    candidates = [query]
+    if anchors:
+        candidates.append(" ".join(list(dict.fromkeys(anchors + task_terms))[:16]))
+    if normalized:
+        candidates.append(" ".join(list(dict.fromkeys(normalized + task_terms))[:16]))
+    if anchors and task_terms:
+        candidates.append(" ".join(list(dict.fromkeys(anchors[:10] + task_terms))[:16]))
 
     deduped: list[str] = []
     seen: set[str] = set()
-    for item in variants:
-        cleaned = " ".join(str(item or "").split())[:220]
+    for item in candidates:
+        cleaned = _compact_text(item, 220)
         key = cleaned.lower()
         if cleaned and key not in seen:
             seen.add(key)
@@ -163,17 +191,88 @@ def _external_query_variants(query: str, limit: int = 3) -> list[str]:
     return deduped
 
 
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return None
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"```$", "", cleaned).strip()
+    try:
+        data = json.loads(cleaned)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        pass
+    match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(0))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _fallback_queries_from_text(text: str, limit: int) -> list[str]:
+    out: list[str] = []
+    for raw in (text or "").splitlines():
+        line = re.sub(r"^\s*[-*\d.)]+\s*", "", raw).strip()
+        if not line or len(line) > 220:
+            continue
+        lowered = line.lower()
+        if any(marker in lowered for marker in ("json", "note:", "because", "should", "return ")):
+            continue
+        if any(ch in line for ch in "{}[]"):
+            continue
+        out.append(line)
+        if len(out) >= limit:
+            break
+    return list(dict.fromkeys(_compact_text(item, 220) for item in out if item.strip()))[:limit]
+
+
+async def _llm_external_query_variants(query: str, base_variants: list[str], limit: int = 4) -> tuple[list[str], str]:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a biomedical literature search query planner. Return JSON only. "
+                "Generate PubMed/PubTator/LitSense search queries from the user's wording. "
+                "Preserve exact user entities and relations, add widely used synonyms or broader scientific vocabulary when useful, "
+                "and avoid making answer claims. Do not tailor to a fixed topic; infer terms from the current query."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"User query: {query[:1000]}\n"
+                f"Deterministic base queries: {base_variants}\n"
+                "Return JSON with keys: queries (1-4 concise keyword queries), note (one sentence explaining retrieval intent)."
+            ),
+        },
+    ]
+    text = await LLMClient().chat_once(
+        messages,
+        provider=settings.llm.context_manager_provider,
+        max_tokens=700,
+    )
+    data = _extract_json_object(text) or {}
+    raw_queries = data.get("queries") if isinstance(data, dict) else []
+    if not isinstance(raw_queries, list):
+        raw_queries = []
+    queries = [str(item).strip() for item in raw_queries if str(item).strip()]
+    if not queries:
+        queries = _fallback_queries_from_text(text, limit)
+    note = _compact_text(str(data.get("note") or ""), 400) if isinstance(data, dict) else ""
+    return queries[:limit], note
+
+
 def _expanded_external_query_terms(query: str) -> set[str]:
-    terms_set = set(important_terms(query, 64))
-    text = (query or "").lower()
-    if any(term in text for term in ("fungi", "fungal", "fungus")):
-        terms_set.update({"fungal", "fungi", "mycobiome", "mycobiota", "candida", "malassezia"})
-    if "candida" in text:
-        terms_set.update({"candida", "albicans", "pge2", "inflammasome", "inflammation"})
-    if any(term in text for term in ("tumorigenesis", "tumorgenesis", "oncogenesis", "carcinogenesis")):
-        terms_set.update({"tumor", "cancer", "development", "oncogenesis", "carcinogenesis", "tumorigenesis"})
-    if any(term in text for term in ("how", "mechanism", "happens")):
-        terms_set.update({"mechanism", "inflammation", "immune", "dysbiosis", "metabolism"})
+    terms_set = set(_policy_query_terms(query, 64))
+    for idea in extract_ideas(query, limit=16):
+        normalized = normalize_idea(idea)
+        if normalized:
+            terms_set.update(important_terms(normalized, 8))
+    terms_set.update(_policy_task_terms(query))
     return terms_set
 
 
@@ -198,11 +297,8 @@ def _rank_external_results(query: str, results: list[dict]) -> list[dict]:
             semantic += 0.04
         if result.get("pmid") or result.get("pmcid"):
             semantic += 0.04
-        query_text = (query or "").lower()
-        result_text = f"{result.get('title') or ''} {result.get('snippet') or ''}".lower()
-        if any(term in query_text for term in ("fungi", "fungal", "fungus", "mycobiome", "mycobiota", "candida", "malassezia")):
-            if not any(term in result_text for term in ("fung", "mycobi", "candida", "malassezia", "mbl", "mannose-binding lectin")):
-                semantic -= 0.25
+        if overlap <= 0.0 and title_overlap <= 0.0:
+            semantic -= 0.20
         provider_score = float(result.get("score", 0.0) or 0.0)
         return overlap + (0.45 * title_overlap) + semantic, provider_score
 
@@ -252,6 +348,37 @@ def _merge_external_results(
         if len(merged) >= k:
             return merged
     return merged
+
+
+async def _enrich_external_results(results: list[dict]) -> list[dict]:
+    pmids = [
+        str(item.get("pmid") or "").strip()
+        for item in results
+        if str(item.get("source") or "") == "pubtator3"
+        and str(item.get("pmid") or "").strip()
+    ]
+    if not pmids:
+        return results
+    try:
+        fetched = await pubmed_fetch_by_pmids(pmids)
+    except Exception as e:
+        print(f"[WARN] ContextPolicy PubTator abstract enrichment failed: {e}")
+        return results
+    enriched: list[dict] = []
+    for item in results:
+        pmid = str(item.get("pmid") or "")
+        replacement = fetched.get(pmid)
+        if replacement and replacement.get("snippet"):
+            merged = dict(item)
+            merged["snippet"] = replacement.get("snippet") or item.get("snippet") or ""
+            merged["title"] = item.get("title") or replacement.get("title") or ""
+            merged["pmcid"] = item.get("pmcid") or replacement.get("pmcid") or ""
+            merged["pmc_url"] = item.get("pmc_url") or replacement.get("pmc_url") or ""
+            merged["abstract_enriched"] = True
+            enriched.append(merged)
+        else:
+            enriched.append(item)
+    return enriched
 
 
 def _render_ideas(ideas: list[dict]) -> str:
@@ -330,6 +457,13 @@ class ContextPolicy:
             pubtator_payload = {"results": [], "query": "", "redacted": False}
             litsense_payload = {"results": [], "query": "", "redacted": False}
             external_queries = _external_query_variants(message, limit=4)
+            external_planner_note = ""
+            if settings.memory.auto_context_llm_refine:
+                try:
+                    llm_queries, external_planner_note = await _llm_external_query_variants(message, external_queries, limit=4)
+                    external_queries = list(dict.fromkeys([*llm_queries, *external_queries]))[:4]
+                except Exception as e:
+                    print(f"[WARN] ContextPolicy external query planning failed: {e}")
             pubmed_results: list[dict] = []
             pubtator_results: list[dict] = []
             litsense_results: list[dict] = []
@@ -338,25 +472,35 @@ class ContextPolicy:
                 try:
                     payload = await pubmed_pmc_search(external_query, remaining)
                     pubmed_payload = payload if not pubmed_payload.get("query") else pubmed_payload
-                    pubmed_results.extend(payload.get("results") or [])
+                    for result in payload.get("results") or []:
+                        item = dict(result)
+                        item["external_query"] = external_query
+                        item["external_query_source"] = "external_planner" if external_query not in _external_query_variants(message, limit=4) else "deterministic"
+                        pubmed_results.append(item)
                 except Exception as e:
                     print(f"[WARN] ContextPolicy PubMed/PMC search failed: {e}")
                 remaining = max(1, settings.memory.web_k - len(pubtator_results))
                 try:
                     payload = await pubtator3_search(external_query, remaining)
                     pubtator_payload = payload if not pubtator_payload.get("query") else pubtator_payload
-                    pubtator_results.extend(payload.get("results") or [])
+                    for result in payload.get("results") or []:
+                        item = dict(result)
+                        item["external_query"] = external_query
+                        item["external_query_source"] = "external_planner" if external_query not in _external_query_variants(message, limit=4) else "deterministic"
+                        pubtator_results.append(item)
                 except Exception as e:
                     print(f"[WARN] ContextPolicy PubTator 3 search failed: {e}")
                 remaining = max(1, settings.memory.web_k - len(litsense_results))
                 try:
                     payload = await litsense2_search(external_query, remaining)
                     litsense_payload = payload if not litsense_payload.get("query") else litsense_payload
-                    litsense_results.extend(payload.get("results") or [])
+                    for result in payload.get("results") or []:
+                        item = dict(result)
+                        item["external_query"] = external_query
+                        item["external_query_source"] = "external_planner" if external_query not in _external_query_variants(message, limit=4) else "deterministic"
+                        litsense_results.append(item)
                 except Exception as e:
                     print(f"[WARN] ContextPolicy LitSense 2.0 search failed: {e}")
-                if len(pubmed_results) + len(pubtator_results) + len(litsense_results) >= settings.memory.web_k * 3:
-                    break
 
             web_payload = (
                 pubmed_payload
@@ -365,13 +509,18 @@ class ContextPolicy:
                 if litsense_payload.get("results")
                 else pubtator_payload
             )
-            web_payload["results"] = _merge_external_results(
-                pubmed_results,
-                pubtator_results,
-                settings.memory.web_k,
-                litsense_results,
-                message,
+            web_payload["results"] = await _enrich_external_results(
+                _merge_external_results(
+                    pubmed_results,
+                    pubtator_results,
+                    settings.memory.web_k,
+                    litsense_results,
+                    " ".join(external_queries),
+                )
             )
+            if external_planner_note:
+                web_payload["planner_note"] = external_planner_note
+            web_payload["query_variants"] = external_queries
             if not web_payload.get("results"):
                 try:
                     web_payload = await duckduckgo_search(message, settings.memory.web_k)

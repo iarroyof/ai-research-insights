@@ -43,31 +43,8 @@ GENERIC_REFINEMENT_TERMS = {
     "system", "systems", "tissue",
 }
 
-MECHANISTIC_SYNERGY_BRIDGE = [
-    "mechanistic synergy tumor microenvironment crosstalk lung cancer",
-    "cooperative interaction stromal immune metabolic hypoxia angiogenesis NSCLC",
-    "CAF tumor associated macrophage Treg MDSC cytokine ECM remodeling EMT immune evasion",
-]
-
-TME_GROWTH_BRIDGE = [
-    "tumor microenvironment factors promote tumor growth NSCLC lung cancer",
-    "CAF TAM MDSC Treg hypoxia angiogenesis ECM remodeling EMT immune suppression",
-    "stromal immune metabolic crosstalk cytokines lactate angiogenesis invasion proliferation",
-]
-
-STROMAL_ECM_BRIDGE = [
-    "cancer associated fibroblast extracellular matrix remodeling stiffness lung cancer",
-    "CAF collagen crosslinking ECM stiffness drug delivery barrier immune infiltration tumor microenvironment",
-    "stromal fibroblast matrix stiffness invasion therapy resistance NSCLC",
-]
-
-FUNGAL_TUMORIGENESIS_BRIDGE = [
-    "mycobiome mycobiota fungal dysbiosis cancer tumorigenesis mechanism",
-    "fungi tumor development oncogenesis inflammation immune modulation dysbiosis",
-    "Candida Malassezia pancreatic cancer colorectal cancer tumorigenesis inflammasome PGE2 complement",
-]
-
 MATH_PHARM_SYNERGY_TERMS = {
+
     "combination index", "ci value", "chou talalay", "dose response", "drug synergy",
     "therapeutic agent", "therapeutic agents", "combination therapy", "cytotoxicity",
     "ic50", "ctcae", "adverse event", "irae", "toxicity", "pharmacological",
@@ -79,41 +56,74 @@ def _contains_any(text: str, values: set[str] | list[str] | tuple[str, ...]) -> 
     return any(value in lowered for value in values)
 
 
+def _query_anchor_terms(message: str, limit: int = 12) -> list[str]:
+    anchors: list[str] = []
+    for term in important_terms(message, limit=limit * 2):
+        cleaned = str(term or "").strip().lower()
+        if (
+            not cleaned
+            or cleaned in GENERIC_REFINEMENT_TERMS
+            or cleaned in AMBIGUITY_MARKERS
+            or cleaned in PUZZLE_NODE_STOP_TERMS
+        ):
+            continue
+        anchors.append(term)
+        if len(anchors) >= limit:
+            break
+    return list(dict.fromkeys(anchors))
+
+
+def _task_bridge_terms(message: str) -> list[str]:
+    intent = _intent_bucket(message)
+    lowered = (message or "").lower()
+    terms: list[str] = []
+    if intent == "mechanism" or any(marker in lowered for marker in ("how", "happen", "why", "pathway", "mechanism")):
+        terms.extend(["mechanism", "pathogenesis", "signaling", "inflammation", "immune", "metabolism"])
+    if intent == "evidence" or any(marker in lowered for marker in ("described", "reported", "study", "paper", "evidence")):
+        terms.extend(["evidence", "review", "study", "reported", "described"])
+    if any(marker in lowered for marker in ("what", "which", "examples", "particular", "specific")):
+        terms.extend(["examples", "types", "species", "organisms", "specific", "reported"])
+    if intent == "compare":
+        terms.extend(["comparison", "difference", "relationship"])
+    return list(dict.fromkeys(terms))[:12]
+
+
 def _domain_search_frame(message: str, notes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     text = (message or "").lower()
-    # Search notes are strategy hints. Specialized biomedical frames must be
-    # justified by the current turn or stale successful terms override a pivot.
     asks_drug_synergy = _contains_any(text, {"drug", "therapy", "therapeutic", "dose", "combination index", "ci value", "pharmacological"})
-    cancer_context = _contains_any(text, {"tme", "tumor microenvironment", "lung", "carcinoma", "cancer", "nsclc"})
     synergy_context = "synergy" in text or "synerg" in text or "crosstalk" in text
-    mechanistic_context = _contains_any(text, {"mechanistic", "mechanism", "pathway", "crosstalk", "interaction", "cooperative", "functional synergy", "pivot"})
-    stromal_ecm_context = _contains_any(text, {"caf", "fibroblast", "ecm", "extracellular matrix", "matrix stiffness", "collagen", "crosslinking"})
-    fungal_context = _contains_any(text, {"fungi", "fungal", "fungus", "candida", "mycobiome", "mycobiota", "malassezia"})
-    tumorigenesis_context = _contains_any(text, {"tumorigenesis", "tumorgenesis", "oncogenesis", "carcinogenesis", "tumor development", "cancer development", "tumor growth"})
+    mechanistic_context = _contains_any(text, {"mechanistic", "mechanism", "pathway", "how", "why", "crosstalk", "interaction", "cooperative", "functional synergy", "pivot"})
+    analogy_context = _contains_any(text, {"analogy", "inspired", "as a", "like", "relationship between", "relating"})
 
+    anchors = _query_anchor_terms(message)
+    task_terms = _task_bridge_terms(message)
     preferred: list[str] = []
     avoid: list[str] = []
     frame = "general_biomedical"
-    if cancer_context and synergy_context and not asks_drug_synergy:
-        frame = "mechanistic_tme_synergy"
-        preferred.extend(MECHANISTIC_SYNERGY_BRIDGE)
-        avoid.extend(sorted(MATH_PHARM_SYNERGY_TERMS))
-    if cancer_context and (_contains_any(text, {"tme", "tumor microenvironment"}) or "growth" in text):
-        frame = "tme_tumor_growth" if frame == "general_biomedical" else frame
-        preferred.extend(TME_GROWTH_BRIDGE)
-    if stromal_ecm_context:
-        frame = "stromal_ecm" if frame == "general_biomedical" else frame
-        preferred.extend(STROMAL_ECM_BRIDGE)
-    if fungal_context and tumorigenesis_context:
-        frame = "fungal_tumorigenesis" if frame == "general_biomedical" else frame
-        preferred.extend(FUNGAL_TUMORIGENESIS_BRIDGE)
-    if mechanistic_context and not asks_drug_synergy:
+    if analogy_context:
+        frame = "cross_domain_or_analogy"
+    elif mechanistic_context:
+        frame = "mechanism_or_pathway"
+    elif _intent_bucket(message) in {"evidence", "question"}:
+        frame = "evidence_question"
+
+    if anchors:
+        preferred.append(" ".join(list(dict.fromkeys(anchors + task_terms))[:14]))
+    normalized = list(dict.fromkeys(normalize_idea(item) for item in extract_ideas(message, limit=8) if normalize_idea(item)))
+    normalized = [item for item in normalized if item not in GENERIC_REFINEMENT_TERMS and item not in NOISY_FEEDBACK_TERMS]
+    if normalized:
+        preferred.append(" ".join(list(dict.fromkeys(normalized + task_terms))[:14]))
+    if mechanistic_context and anchors:
+        preferred.append(" ".join(list(dict.fromkeys(anchors[:8] + ["mechanism", "evidence", "relationship"]))[:12]))
+    if synergy_context and not asks_drug_synergy:
         avoid.extend(sorted(MATH_PHARM_SYNERGY_TERMS))
 
     return {
         "frame": frame,
-        "preferred_queries": list(dict.fromkeys(preferred))[:6],
+        "preferred_queries": list(dict.fromkeys(item for item in preferred if item.strip()))[:6],
         "avoid_terms": list(dict.fromkeys(avoid))[:24],
+        "anchor_terms": anchors[:12],
+        "task_terms": task_terms[:8],
     }
 
 
@@ -804,12 +814,14 @@ def _is_off_topic_hit(item: dict[str, Any], search_frame: dict[str, Any]) -> boo
     ).lower()
     if not _contains_any(text, avoid_terms):
         return False
-    preferred_markers = {
-        "tme", "tumor microenvironment", "stromal", "fibroblast", "caf", "macrophage",
-        "hypoxia", "angiogenesis", "immune evasion", "ecm", "emt", "nsclc",
-        "lung cancer", "lung carcinoma", "mechanistic", "crosstalk",
+    anchor_terms = {
+        term.lower()
+        for term in (search_frame.get("anchor_terms") or [])
+        if isinstance(term, str) and len(term) >= 3
     }
-    return not _contains_any(text, preferred_markers)
+    focus_anchors = anchor_terms - {"synergy", "synergistic", "functional", "mechanistic", "effect", "effects"}
+    item_terms = set(important_terms(text, 128))
+    return not bool((focus_anchors or anchor_terms) & item_terms)
 
 
 def _query_with_feedback(query: str, feedback_terms: list[str], *, level: str) -> str:

@@ -337,7 +337,7 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([item["source"] for item in merged], ["pubmed", "litsense2_sentence", "pubtator3"])
 
-    def test_external_query_variants_translate_fungal_tumorigenesis_terms(self):
+    def test_external_query_variants_translate_current_terms_without_topic_bridge(self):
         from app.memory.policy import _external_query_variants
 
         variants = _external_query_variants(
@@ -347,18 +347,21 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
         joined = " ".join(variants).lower()
 
         self.assertGreaterEqual(len(variants), 2)
-        self.assertIn("mycobiome", joined)
-        self.assertIn("dysbiosis", joined)
+        self.assertIn("fungi", joined)
         self.assertIn("tumorigenesis", joined)
+        self.assertIn("mechanism", joined)
+        self.assertIn("species", joined)
+        self.assertNotIn("candida albicans", joined)
 
-    def test_external_query_variants_prioritize_candida_mechanism_bridge(self):
+    def test_external_query_variants_preserve_specific_user_entity_without_fixed_species_bridge(self):
         from app.memory.policy import _external_query_variants
 
         variants = _external_query_variants("Is candida a fungi promoting tumorgenesis?", limit=4)
         joined = " ".join(variants).lower()
 
-        self.assertIn("candida albicans promotes tumorigenesis", joined)
-        self.assertIn("pge2", joined)
+        self.assertIn("candida", joined)
+        self.assertIn("tumorgenesis", joined)
+        self.assertNotIn("candida albicans promotes tumorigenesis", joined)
 
     def test_external_ranking_promotes_semantic_pubtator_title(self):
         from app.memory.policy import _merge_external_results
@@ -368,15 +371,38 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
                 {"source": "pmc", "pmid": "42148290", "title": "Microbial extracellular vesicles in the lung", "snippet": "Respiratory inflammation."},
             ],
             [
-                {"source": "pubtator3", "pmid": "34298645", "title": "Micro- and Mycobiota Dysbiosis in Pancreatic Ductal Adenocarcinoma Development", "snippet": "Micro- and Mycobiota Dysbiosis in Pancreatic Ductal Adenocarcinoma Development"},
+                {"source": "pubtator3", "pmid": "34298645", "title": "Fungi and tumorigenesis mechanisms", "snippet": "Fungal organisms are reported in cancer tumorigenesis mechanisms."},
             ],
             2,
             [],
-            "what fungi are described as playing essential roles in tumorigenesis and how it happens",
+            "what fungi are described as playing essential roles in tumorigenesis and how it happens fungi tumorigenesis mechanism",
         )
 
         self.assertEqual(merged[0]["pmid"], "34298645")
         self.assertGreater(merged[0]["external_rank_score"], merged[1]["external_rank_score"])
+
+    async def test_pubmed_fetch_by_pmids_enriches_pubtator_title_hits(self):
+        from app.memory.web_search import pubmed_fetch_by_pmids
+
+        FakeEutilsAsyncClient.gets = []
+        with patch("httpx.AsyncClient", FakeEutilsAsyncClient):
+            result = await pubmed_fetch_by_pmids(["123"])
+
+        self.assertIn("123", result)
+        self.assertEqual(result["123"]["snippet"], "CAF-derived HGF activates MET in lung cancer.")
+        self.assertEqual(FakeEutilsAsyncClient.gets[0]["params"]["id"], "123")
+
+    async def test_external_enrichment_replaces_sparse_pubtator_snippet(self):
+        from app.memory.policy import _enrich_external_results
+
+        async def fake_fetch(pmids):
+            return {"123": {"pmid": "123", "pmcid": "PMC123", "snippet": "Long abstract evidence describes the mechanism and example in detail."}}
+
+        with patch("app.memory.policy.pubmed_fetch_by_pmids", side_effect=fake_fetch):
+            enriched = await _enrich_external_results([{"source": "pubtator3", "pmid": "123", "title": "Sparse title", "snippet": "Sparse title"}])
+
+        self.assertTrue(enriched[0]["abstract_enriched"])
+        self.assertIn("Long abstract evidence", enriched[0]["snippet"])
 
 
 if __name__ == "__main__":

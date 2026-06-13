@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from evals.lung_factuality_lab.src.assistant_adapters import build_adapter
+from evals.lung_factuality_lab.src.assistant_adapters import HttpChatAdapter, build_adapter
 from evals.lung_factuality_lab.src.conversation_generator import generate_conversation
 from evals.lung_factuality_lab.src.conversation_loader import load_seed_conversation
 from evals.lung_factuality_lab.src.run_batch import _resolve_scenarios
@@ -36,6 +37,30 @@ class ConversationAssetTests(unittest.TestCase):
 
         self.assertIn("decrease MET signaling", answer.answer)
         self.assertEqual(answer.adapter_meta["wrong_answer_id"], "wrong_hgf_met_inverse_001")
+
+    def test_http_adapter_empty_stream_returns_fallback_answer(self):
+        class EmptyStream:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def __iter__(self):
+                yield b'data: {"type":"citations","data":{"generation_telemetry":{"puzzle_state":{"edge_support_status":"missing","covered_nodes":["tme"],"missing_nodes":["caf"]}}}}\n'
+                yield b"data: [DONE]\n"
+
+        scenario = load_scenario("correction_scope_tme_only_001__gen_004")
+        turn = generate_conversation(scenario)[2]
+        adapter = HttpChatAdapter(endpoint="http://example.invalid/chat", request_timeout=1.0)
+
+        with patch("urllib.request.urlopen", return_value=EmptyStream()):
+            answer = adapter.answer(scenario, turn, [])
+
+        self.assertIn("did not return textual answer tokens", answer.answer)
+        self.assertTrue(answer.adapter_meta["adapter_empty_answer_fallback"])
+        self.assertTrue(answer.adapter_meta["adapter_stream"]["done_seen"])
+        self.assertIn("citations", answer.adapter_meta)
 
     def test_run_single_wrong_answer_replay_writes_evaluator_fixture_trace(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -146,6 +146,15 @@ def _hf_batch_size() -> int:
         return 8
 
 
+def _nli_panel_models() -> list[str]:
+    configured = str(getattr(settings.memory, "nli_panel_models", "") or "")
+    items = [item.strip() for item in configured.split(",") if item.strip()]
+    primary = str(getattr(settings.memory, "nli_model", "") or "").strip()
+    if primary:
+        items.insert(0, primary)
+    return list(dict.fromkeys(items))
+
+
 def _retryable_status(status_code: int) -> bool:
     return status_code in {408, 409, 425, 429, 500, 502, 503, 504}
 
@@ -161,7 +170,7 @@ def _retry_delay(attempt: int, backoff: float, response: httpx.Response | None =
     return backoff * (2 ** max(0, attempt - 1))
 
 
-async def _hf_api_nli_batch(pairs: list[tuple[str, str]]) -> list[Dict[str, Any]]:
+async def _hf_api_nli_batch_for_model(pairs: list[tuple[str, str]], model: str) -> list[Dict[str, Any]]:
     if not pairs:
         return []
     token = _clean_hf_token(settings.memory.hf_api_token)
@@ -170,7 +179,7 @@ async def _hf_api_nli_batch(pairs: list[tuple[str, str]]) -> list[Dict[str, Any]
         return [_heuristic_nli(premise, hypothesis) for premise, hypothesis in pairs]
 
     base = settings.memory.hf_api_base_url.rstrip("/")
-    url = f"{base}/{settings.memory.nli_model}"
+    url = f"{base}/{model}"
     inputs = [f"{hypothesis} [SEP] {premise}" for premise, hypothesis in pairs]
     payload = {
         "inputs": inputs[0] if len(inputs) == 1 else inputs,
@@ -242,10 +251,87 @@ async def _hf_api_nli_batch(pairs: list[tuple[str, str]]) -> list[Dict[str, Any]
                 "label": label,
                 **scores,
                 "provider": "hf_api",
-                "model": settings.memory.nli_model,
+                "model": model,
             }
         )
     return out
+
+
+async def _hf_api_nli_batch(pairs: list[tuple[str, str]]) -> list[Dict[str, Any]]:
+    return await _hf_api_nli_batch_for_model(pairs, settings.memory.nli_model)
+
+
+def _aggregate_nli_panel(per_pair: list[list[Dict[str, Any]]]) -> list[Dict[str, Any]]:
+    out: list[Dict[str, Any]] = []
+    for panel in per_pair:
+        successes = [
+            item for item in panel
+            if not item.get("error") and item.get("provider") != "heuristic_panel_fallback"
+        ]
+        usable = successes or [item for item in panel if not item.get("error")]
+        if not usable:
+            usable = [_heuristic_nli("", "")]
+        entailments = [float(item.get("entailment", 0.0) or 0.0) for item in usable]
+        contradictions = [float(item.get("contradiction", 0.0) or 0.0) for item in usable]
+        neutrals = [float(item.get("neutral", 0.0) or 0.0) for item in usable]
+        labels = [str(item.get("label") or "neutral") for item in usable]
+        scores = {
+            "entailment": round(sum(entailments) / max(1, len(entailments)), 4),
+            "contradiction": round(max(contradictions) if contradictions else 0.0, 4),
+            "neutral": round(sum(neutrals) / max(1, len(neutrals)), 4),
+        }
+        label = max(scores, key=lambda key: scores[key])
+        agreement = labels.count(label) / max(1, len(labels))
+        out.append(
+            {
+                "label": label,
+                **scores,
+                "provider": "nli_panel",
+                "model": "panel",
+                "panel_success_count": len(successes),
+                "panel_size": len(panel),
+                "panel_agreement": round(agreement, 4),
+                "panel": panel,
+            }
+        )
+    return out
+
+
+async def _hf_api_nli_panel_batch(pairs: list[tuple[str, str]]) -> list[Dict[str, Any]]:
+    if not pairs:
+        return []
+    models = _nli_panel_models()
+    if not models:
+        return await _hf_api_nli_batch(pairs)
+    per_pair: list[list[Dict[str, Any]]] = [[] for _ in pairs]
+    for model in models:
+        try:
+            results = await _hf_api_nli_batch_for_model(pairs, model)
+        except Exception as exc:
+            results = [
+                {
+                    "label": "neutral",
+                    "entailment": 0.0,
+                    "contradiction": 0.0,
+                    "neutral": 1.0,
+                    "provider": "hf_api",
+                    "model": model,
+                    "error": exc.__class__.__name__,
+                }
+                for _ in pairs
+            ]
+        for idx, result in enumerate(results[: len(pairs)]):
+            per_pair[idx].append(result)
+    min_successes = max(1, int(getattr(settings.memory, "nli_panel_min_successes", 1) or 1))
+    for idx, panel in enumerate(per_pair):
+        successes = [item for item in panel if not item.get("error")]
+        if len(successes) < min_successes:
+            premise, hypothesis = pairs[idx]
+            fallback = _heuristic_nli(premise, hypothesis)
+            fallback["provider"] = "heuristic_panel_fallback"
+            fallback["model"] = "heuristic"
+            panel.append(fallback)
+    return _aggregate_nli_panel(per_pair)
 
 
 async def _hf_api_nli(premise: str, hypothesis: str) -> Dict[str, Any]:
@@ -291,6 +377,8 @@ async def _llm_nli(premise: str, hypothesis: str) -> Dict[str, Any]:
 async def classify_nli(premise: str, hypothesis: str) -> Dict[str, Any]:
     provider = settings.memory.nli_provider
     if provider == "hf_api":
+        if bool(getattr(settings.memory, "nli_panel_enabled", False)):
+            return (await _hf_api_nli_panel_batch([(premise, hypothesis)]))[0]
         return await _hf_api_nli(premise, hypothesis)
     if provider == "http":
         return await _http_nli(premise, hypothesis)
@@ -307,7 +395,11 @@ async def classify_nli_batch(pairs: list[tuple[str, str]]) -> list[Dict[str, Any
         batch_size = _hf_batch_size()
         out: list[dict[str, Any]] = []
         for start in range(0, len(pairs), batch_size):
-            out.extend(await _hf_api_nli_batch(pairs[start : start + batch_size]))
+            batch = pairs[start : start + batch_size]
+            if bool(getattr(settings.memory, "nli_panel_enabled", False)):
+                out.extend(await _hf_api_nli_panel_batch(batch))
+            else:
+                out.extend(await _hf_api_nli_batch(batch))
         return out
     return [await classify_nli(premise, hypothesis) for premise, hypothesis in pairs]
 

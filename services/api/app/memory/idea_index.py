@@ -169,10 +169,11 @@ def build_idea_updates(
     reward_score: float = 0.0,
     shared: bool = False,
     limit: int = 32,
+    scope_override: str | None = None,  # WP-F-2: e.g. user_{user_id}
 ) -> list[dict[str, Any]]:
     ideas = extract_ideas(*list(texts), limit=limit)
     counts = Counter(ideas)
-    scope = "shared" if shared else session_id
+    scope = scope_override if scope_override else ("shared" if shared else session_id)  # WP-F-2
     updates: list[dict[str, Any]] = []
     for idea in ideas:
         parent = parent_for_idea(idea, ideas)

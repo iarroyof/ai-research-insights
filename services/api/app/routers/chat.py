@@ -1,10 +1,12 @@
 # services/api/app/routers/chat.py
+import asyncio
 import hashlib
 import re
 import uuid
 import json
 import time
 from typing import List, Optional, Dict, Any
+import httpx
 from fastapi import APIRouter, Request
 from starlette.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -15,6 +17,7 @@ from app.config import settings
 # LLM client
 from app.clients.llm import LLMClient
 from app.memory.policy import ContextPolicy
+from app.prompts.agent_prompts import answer_system_prompt
 from app.memory.search_agent import build_auto_context
 from app.memory.store import MemoryStore
 from app.services.provider_metrics import snapshot_provider_metrics
@@ -168,8 +171,217 @@ def _hold_generation_for_clarification(evidence_assembly: Dict[str, Any] | None)
     if not assembly.get("clarification_recommended"):
         return False
     edge_status = ((assembly.get("evidence_puzzle") or {}).get("edge_support_status") or "").lower()
-    return edge_status in {"missing", "partial"}
+    if edge_status != "missing":
+        return False
+    puzzle = assembly.get("evidence_puzzle") or {}
+    missing_nodes = [
+        str(item).strip()
+        for item in (puzzle.get("missing_nodes") or [])
+        if str(item or "").strip()
+    ]
+    level_counts = assembly.get("level_result_counts") or {}
+    retrieved_count = sum(int(count or 0) for count in level_counts.values())
+    if not missing_nodes and retrieved_count > 0:
+        return False
+    return True
 
+
+def _provider_error_payload(exc: Exception) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "message": "Hosted chat generation failed. The endpoint will return retrieved evidence and diagnostics instead of closing the stream.",
+        "error_type": exc.__class__.__name__,
+    }
+    if isinstance(exc, httpx.HTTPStatusError):
+        payload["status_code"] = exc.response.status_code
+        payload["provider_url"] = str(exc.request.url)
+    return payload
+
+
+def _evidence_only_fallback_answer(
+    *,
+    citations: Dict[str, Any] | None,
+    context_plan,
+    auto_context_plan: Dict[str, Any] | None,
+) -> str:
+    snippets = (citations or {}).get("snippets", []) if isinstance(citations, dict) else []
+    web_results = list(getattr(context_plan, "web_results", []) or [])
+    puzzle = ((auto_context_plan or {}).get("evidence_assembly") or {}).get("evidence_puzzle") or {}
+    lines = [
+        "Hosted chat generation failed before a complete answer was produced. I can still report the retrieved evidence state:",
+    ]
+    if puzzle:
+        covered = _display_terms(puzzle.get("covered_nodes"), limit=6)
+        missing = _display_terms(puzzle.get("missing_nodes"), limit=6)
+        edge_status = str(puzzle.get("edge_support_status") or "uncertain")
+        lines.append(f"- Evidence puzzle: edge support is {edge_status}.")
+        if covered:
+            lines.append(f"- Covered nodes: {covered}.")
+        if missing:
+            lines.append(f"- Missing nodes: {missing}.")
+    if snippets:
+        lines.append("- Local evidence:")
+        for idx, snippet in enumerate(snippets[:3], start=1):
+            text = str(snippet.get("text") or snippet.get("title") or "").strip()
+            if text:
+                lines.append(f"  {idx}. {text[:360]}")
+    if web_results:
+        lines.append("- External biomedical grounding:")
+        for idx, result in enumerate(web_results[:3], start=1):
+            title = str(result.get("title") or result.get("source") or "external result").strip()
+            snippet = str(result.get("snippet") or "").strip()
+            provenance = result.get("pmid") or result.get("pmcid") or ""
+            suffix = f" ({provenance})" if provenance else ""
+            lines.append(f"  {idx}. {title}{suffix}: {snippet[:360]}")
+    if len(lines) == 1:
+        lines.append("- No usable evidence was retrieved before the provider failure.")
+    lines.append("Please retry generation; retrieval diagnostics and citations are included below.")
+    return "\n".join(lines) + "\n"
+
+
+def _retrieval_pipeline_trace(
+    *,
+    auto_context_plan: Dict[str, Any] | None,
+    context_plan,
+    answer_mode: str,
+    external_grounding_covers_puzzle: bool,
+) -> Dict[str, Any]:
+    auto_context_plan = auto_context_plan or {}
+    evidence_assembly = auto_context_plan.get("evidence_assembly") or {}
+    meta = getattr(context_plan, "meta", {}) or {}
+    return {
+        "version": "search_retrieval_pipeline:v1",
+        "sequence": [
+            {
+                "step": "frame_interpretation",
+                "owner": "SearchAgent",
+                "output": {
+                    "search_frame": auto_context_plan.get("search_frame", {}),
+                    "state_key": auto_context_plan.get("state_key"),
+                    "action_key": auto_context_plan.get("action_key"),
+                },
+            },
+            {
+                "step": "local_multilevel_retrieval",
+                "owner": "SearchAgent",
+                "output": {
+                    "levels": auto_context_plan.get("levels", []),
+                    "result_count": auto_context_plan.get("result_count", 0),
+                    "skipped_off_topic_count": auto_context_plan.get("skipped_off_topic_count", 0),
+                    "retrieval_record_count": len(auto_context_plan.get("retrieval_records", []) or []),
+                },
+            },
+            {
+                "step": "evidence_puzzle_assembly",
+                "owner": "EvidenceAssembly",
+                "output": {
+                    "clarification_recommended": bool(evidence_assembly.get("clarification_recommended")),
+                    "puzzle": evidence_assembly.get("evidence_puzzle", {}),
+                    "refinement_quality": evidence_assembly.get("refinement_quality", {}),
+                },
+            },
+            {
+                "step": "session_memory_retrieval",
+                "owner": "MemoryAgent",
+                "output": {
+                    "selected_context_count": len(getattr(context_plan, "selected_context", []) or []),
+                    "triplet_count": len(getattr(context_plan, "retrieved_triplets", []) or []),
+                    "idea_count": meta.get("idea_count", 0),
+                },
+            },
+            {
+                "step": "external_biomedical_grounding",
+                "owner": "ContextPolicy",
+                "output": {
+                    "web_result_count": len(getattr(context_plan, "web_results", []) or []),
+                    "query_seed_source": meta.get("web_query_seed_source"),
+                    "query_variants": meta.get("web_query_variants", []),
+                    "multi_search_attempts": meta.get("web_multi_search_attempts", []),
+                    "external_grounding_covers_puzzle": external_grounding_covers_puzzle,
+                },
+            },
+            {
+                "step": "answer_policy",
+                "owner": "AnswerPolicyAgent",
+                "output": {
+                    "answer_mode": answer_mode,
+                    "external_grounding_override": external_grounding_covers_puzzle,
+                },
+            },
+            {
+                "step": "post_generation_verification",
+                "owner": "PostGenerationVerifier",
+                "output": {
+                    "guard_expected": _needs_post_generation_guard(answer_mode, evidence_assembly),
+                },
+            },
+        ],
+    }
+
+
+_PUZZLE_NODE_STOPWORDS = frozenset({
+    # Core function words / verbs / prepositions
+    "does", "play", "role", "make", "have", "been", "that", "with", "from", "this",
+    "what", "how", "why", "when", "where", "which", "who", "the", "and", "for",
+    "are", "was", "its", "not", "but", "also", "can", "may", "will", "shall",
+    # Common adjectives / quantifiers
+    "possible", "likely", "various", "certain", "multiple", "specific",
+    "known", "given", "new", "old", "big", "small", "high", "low", "more", "less",
+    "all", "any", "some", "each", "both", "other", "such", "one", "two", "three",
+    # Common verbs / gerunds appearing in queries
+    "involving", "include", "including", "using", "use", "used", "based", "related",
+    "associated", "show", "shows", "shown", "found", "suggest", "suggests", "affect",
+    # Generic nouns
+    "life", "style", "body", "type", "form", "part", "way", "time", "case", "level",
+    "effect", "function", "system", "process", "activity", "response", "outcome",
+    "lung",
+    # Logical connectors
+    "between", "through", "without", "within", "during", "before", "after",
+    "under", "over", "around", "another", "among", "across", "about", "toward",
+    "because", "therefore", "however", "although",
+})
+
+
+def _specific_puzzle_nodes(puzzle):
+    """Filter puzzle nodes to specific biomedical terms only (exclude common English words)."""
+    raw = puzzle.get("missing_nodes") or puzzle.get("candidate_nodes") or []
+    return [
+        str(item).strip().lower()
+        for item in raw
+        if str(item or "").strip()
+        and str(item).strip().lower() not in _PUZZLE_NODE_STOPWORDS
+        and len(str(item).strip()) > 2
+    ]
+
+
+def _external_grounding_covers_puzzle(evidence_assembly: Dict[str, Any] | None, web_results: List[Dict[str, Any]] | None) -> bool:
+    """Return True when external web results are sufficient to attempt a direct answer.
+
+    Old logic required ALL specific puzzle nodes in ONE result (too strict).
+    New logic: if any web results exist, override clarification and attempt direct_answer.
+    The direct_answer contract already requires the LLM to separate supported facts from
+    unsupported bridges, so it handles partial or off-topic evidence gracefully.
+    """
+    assembly = evidence_assembly or {}
+    if not _hold_generation_for_clarification(assembly):
+        return False  # Clarification was not recommended; nothing to override
+    if not web_results:
+        return False  # No web evidence at all; clarification may genuinely help
+    puzzle = assembly.get("evidence_puzzle") or {}
+    nodes = _specific_puzzle_nodes(puzzle)
+    if not nodes:
+        return True  # All query terms are stopwords; any web result is sufficient
+    # Collective coverage: any specific node appearing anywhere across all results
+    all_covered: set = set()
+    for result in web_results:
+        for item in (result.get("external_anchor_covered") or []):
+            all_covered.add(str(item or "").strip().lower())
+        text = " ".join(str(result.get(key) or "") for key in ("title", "snippet")).lower()
+        for node in nodes:
+            if node in text:
+                all_covered.add(node)
+    # Whether or not coverage matched, web results exist: attempt direct_answer.
+    # The LLM will express uncertainty about missing evidence explicitly.
+    return True
 
 ANSWER_MODE_CONTRACTS: Dict[str, str] = {
     "direct_answer": "Answer directly from supplied evidence. Separate supported facts from unsupported bridges.",
@@ -220,7 +432,20 @@ def _answer_mode(message: str, evidence_assembly: Dict[str, Any] | None, *, corr
         return "phrase_evaluation"
     if _contains_any_text(message, ("reward model", "evaluator", "trace evidence", "before changing code", "diagnostic", "debug")):
         return "diagnostic_trace_answer"
-    if _contains_any_text(message, ("novice", "one paragraph", "one-paragraph", "rewrite", "summarize", "summary")):
+    if _contains_any_text(
+        message,
+        (
+            "novice",
+            "one paragraph",
+            "one-paragraph",
+            "rewrite",
+            "summarize",
+            "summary",
+            "concise answer",
+            "essential caveat",
+            "must not disappear",
+        ),
+    ):
         return "novice_rewrite"
     if _contains_any_text(message, ("mechanism", "mechanistic", "pathway", "explain how", "why does")):
         return "expert_mechanism"
@@ -605,12 +830,23 @@ async def chat(req: Request, body: ChatRequest):
             message=body.message,
             allow_web_search=bool(allow_web and not diagnostic_or_correction_mode),
             confidence_min=body.options.confidence_min,
+            evidence_assembly=active_evidence_assembly,
+            gap_spec=(auto_context_plan or {}).get("gap_spec"),  # WP-B: pass GapSpec to steer retries
         )
         if context_plan.context_prefix:
             prompt = f"{context_plan.context_prefix}\n\nGrounded task prompt:\n{prompt}"
         if context_plan.warnings:
             warning_block = "\n".join(f"- {w}" for w in context_plan.warnings)
             prompt = f"Potential consistency warnings:\n{warning_block}\n\n{prompt}"
+    external_grounding_covers_puzzle = _external_grounding_covers_puzzle(active_evidence_assembly, context_plan.web_results if context_plan else [])
+    if external_grounding_covers_puzzle and answer_mode == "clarification":
+        answer_mode = "direct_answer"
+        answer_mode_contract = ANSWER_MODE_CONTRACTS[answer_mode]
+        prompt = (
+            "Answer-mode override: privacy-filtered external biomedical grounding covers the missing local evidence puzzle nodes. "
+            "Answer directly from the combined local and external context, keep provenance explicit, and do not ask for clarification solely because local snippets were sparse.\n\n"
+            f"Grounded task prompt:\n{prompt}"
+        )
     
     # Initialize LLM client
     llm = LLMClient()
@@ -627,16 +863,7 @@ async def chat(req: Request, body: ChatRequest):
         messages = [
             {
                 "role": "system",
-                "content": (
-                    "You are a helpful research assistant. Answer based on the provided context, including numbered snippets, memory context, and privacy-filtered external biomedical grounding. "
-                    "If local snippets are too sparse but external PubMed/PMC/LitSense/PubTator grounding is supplied, use the external grounding with provenance and explicit caveats. "
-                    "Do not add outside biomedical mechanisms, examples, mediators, therapies, or pathway steps "
-                    "when the supplied context does not directly support them. If a relation is only plausible "
-                    "from general knowledge, label it as not supported by the supplied context instead of explaining it as true. "
-                    "Do not treat missing evidence in the current snippets as evidence that a relation has no plausible connection; "
-                    "say the supplied context is insufficient for that exclusion unless a cited snippet directly supports the exclusion. "
-                    "Avoid 'known', 'plausible', 'implies', 'suggests', and 'likely' for a relation unless the cited context directly supports that relation."
-                ),
+                "content": answer_system_prompt(answer_mode),
             },
         ]
         native_history = _native_history_messages(
@@ -647,11 +874,22 @@ async def chat(req: Request, body: ChatRequest):
         messages.append({"role": "user", "content": prompt})
         prompt_context_hash = _prompt_hash(evidence_assembly_context)
         prompt_snapshot_hash = _prompt_hash(messages[0]["content"], prompt, answer_mode)
+        prompt_token_estimate = max(1, (len(messages[0]["content"]) + len(prompt)) // 4)
         generation_telemetry = {
             "answer_mode": answer_mode,
             "answer_mode_contract": answer_mode_contract,
             "prompt_hash": prompt_snapshot_hash,
             "prompt_context_hash": prompt_context_hash,
+            "context_window": {
+                "max_input_tokens": settings.llm.max_input_tokens,
+                "context_token_budget": max(256, int(settings.llm.max_input_tokens * settings.memory.token_budget_ratio)),
+                "memory_working_buffer_token_budget": settings.memory.working_buffer_token_budget,
+                "memory_token_budget_ratio": settings.memory.token_budget_ratio,
+                "prompt_token_estimate": prompt_token_estimate,
+                "nvidia_max_output_tokens": settings.llm.nvidia_max_tokens,
+                "provider_timeout_sec": settings.llm.provider_timeout_sec,
+            },
+            "external_grounding_covers_puzzle": external_grounding_covers_puzzle,
             "puzzle_state": {
                 **(((active_evidence_assembly or {}).get("evidence_puzzle")) or {}),
                 "clarification_recommended": bool((active_evidence_assembly or {}).get("clarification_recommended")),
@@ -666,15 +904,15 @@ async def chat(req: Request, body: ChatRequest):
                 yield {"type": "memory_debug", "data": context_plan.meta}
         
         answer_parts: List[str] = []
-        opening_prefix = _opening_clarification_prefix(
+        hold_for_clarification = (not external_grounding_covers_puzzle) and _hold_generation_for_clarification(
+            (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
+        )
+        opening_prefix = "" if not hold_for_clarification else _opening_clarification_prefix(
             (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
         )
         if opening_prefix:
             answer_parts.append(opening_prefix)
             yield {"type": "token", "data": opening_prefix}
-        hold_for_clarification = _hold_generation_for_clarification(
-            (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
-        )
         guard_generation = _needs_post_generation_guard(answer_mode, active_evidence_assembly)
         post_generation_trace: Dict[str, Any] = {
             "applied": False,
@@ -697,25 +935,53 @@ async def chat(req: Request, body: ChatRequest):
                 }.items()
                 if value
             }
-            async for chunk in llm.chat_stream(messages, **chat_kwargs):
-                # Parse OpenAI-format JSON chunk
-                if chunk == "[DONE]":
-                    break
-                
-                try:
-                    data = json.loads(chunk)
-                    
-                    # Extract text content from OpenAI format
-                    if "choices" in data and len(data["choices"]) > 0:
-                        delta = data["choices"][0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            answer_parts.append(content)
-                            if not guard_generation:
-                                yield {"type": "token", "data": content}
-                except json.JSONDecodeError:
-                    # Skip malformed chunks
-                    continue
+            provider_error: Dict[str, Any] | None = None
+            try:
+                async with asyncio.timeout(settings.llm.provider_timeout_sec):
+                    async for chunk in llm.chat_stream(messages, agent="answer", **chat_kwargs):
+                        # Parse OpenAI-format JSON chunk
+                        if chunk == "[DONE]":
+                            break
+                        
+                        try:
+                            data = json.loads(chunk)
+                            
+                            # Extract text content from OpenAI format
+                            if "choices" in data and len(data["choices"]) > 0:
+                                delta = data["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    answer_parts.append(content)
+                                    if not guard_generation:
+                                        yield {"type": "token", "data": content}
+                        except json.JSONDecodeError:
+                            # Skip malformed chunks
+                            continue
+            except Exception as exc:
+                provider_error = _provider_error_payload(exc)
+                generation_telemetry["provider_error"] = provider_error
+                yield {"type": "warning", "data": provider_error}
+                if not "".join(answer_parts).strip():
+                    fallback = _evidence_only_fallback_answer(
+                        citations=(citations if isinstance(citations, dict) else {}),
+                        context_plan=context_plan,
+                        auto_context_plan=auto_context_plan,
+                    )
+                    answer_parts = [fallback]
+                    yield {"type": "token", "data": fallback}
+            if not provider_error and not "".join(answer_parts).strip():
+                generation_telemetry["empty_stream_fallback"] = {
+                    "message": "Hosted chat stream completed without textual token content; emitted evidence-only fallback.",
+                    "answer_mode": answer_mode,
+                }
+                fallback = _evidence_only_fallback_answer(
+                    citations=(citations if isinstance(citations, dict) else {}),
+                    context_plan=context_plan,
+                    auto_context_plan=auto_context_plan,
+                )
+                answer_parts = [fallback]
+                if not guard_generation:
+                    yield {"type": "token", "data": fallback}
             if guard_generation:
                 repaired, post_generation_trace = _post_generation_expansion_guard(
                     "".join(answer_parts),
@@ -766,80 +1032,44 @@ async def chat(req: Request, body: ChatRequest):
                     "prompt_context_hash": prompt_context_hash,
                     "query_labels": auto_context_plan.get("query_labels", []),
                     "used_llm": auto_context_plan.get("used_llm", False),
+                    # WP-B/D: GapSpec and per-step rewards
+                    "gap_spec": auto_context_plan.get("gap_spec", {}),
+                    "step_rewards": auto_context_plan.get("step_rewards", []),
                 }
+            citations_payload["retrieval_pipeline"] = _retrieval_pipeline_trace(
+                auto_context_plan=auto_context_plan,
+                context_plan=context_plan,
+                answer_mode=answer_mode,
+                external_grounding_covers_puzzle=external_grounding_covers_puzzle,
+            )
             citations = citations_payload
 
         yield {"type": "citations", "data": citations}
 
         if context_plan:
             answer_text = "".join(answer_parts)
-            try:
-                observed_context = list(context_plan.selected_context)
-                observed_context.extend({"source": "auto_context", **item} for item in auto_context_snippets)
-                trace = await ContextPolicy(tenant).observe_turn(
-                    session_id=session_id,
-                    turn_index=context_plan.turn_index,
-                    question=body.message,
-                    answer=answer_text,
-                    selected_context=observed_context,
-                    retrieved_triplets=context_plan.retrieved_triplets,
-                    pinned_snippets=pinned_items,
-                    source_sentences=(citations.get("snippets", []) if isinstance(citations, dict) else []),
-                    search_plan={**(auto_context_plan or {}), "answer_mode": answer_mode, "prompt_hash": prompt_snapshot_hash, "prompt_context_hash": prompt_context_hash},
-                    started_at=started_at,
-                    token_budget=body.options.token_budget,
-                )
-                if trace.get("conflicts"):
-                    yield {
-                        "type": "consistency_warning",
-                        "data": {
-                            "message": "The generated answer may conflict with retrieved triplet memory. Please confirm which fact should be treated as authoritative.",
-                            "conflicts": trace.get("conflicts", [])[:2],
-                        },
-                    }
-                nli_evidence = trace.get("nli_evidence", [])
-                nli_contradictions = [
-                    e for e in nli_evidence
-                    if float(e.get("contradiction", 0.0) or 0.0) >= settings.memory.nli_contradiction_threshold
-                ]
-                if nli_contradictions:
-                    yield {
-                        "type": "consistency_warning",
-                        "data": {
-                            "message": "Biomedical NLI evidence suggests that one or more answer claims may contradict their source sentences.",
-                            "nli_evidence": nli_contradictions[:2],
-                        },
-                    }
-                claim_support = trace.get("claim_support", [])
-                claim_contradictions = [
-                    c for c in claim_support
-                    if c.get("status") == "contradicted" or c.get("needs_user_confirmation")
-                ]
-                if claim_contradictions:
-                    yield {
-                        "type": "consistency_warning",
-                        "data": {
-                            "message": "Source-sentence factuality checks suggest that one or more answer claims may contradict available evidence. Please confirm which fact should be treated as authoritative.",
-                            "claims": claim_contradictions[:2],
-                        },
-                    }
-                longitudinal_warnings = (trace.get("longitudinal_consistency", {}) or {}).get("warnings", [])
-                if longitudinal_warnings:
-                    yield {
-                        "type": "consistency_warning",
-                        "data": {
-                            "message": "Cross-turn memory consistency checks found possible drift or conflicts with prior evidence-supported conversation memory.",
-                            "warnings": longitudinal_warnings[:3],
-                        },
-                    }
-                if body.options.expose_memory_debug:
-                    yield {"type": "reward", "data": trace.get("reward", {})}
-                    yield {"type": "evidence_table", "data": trace.get("evidence_table", {})}
-                    yield {"type": "conversation_frame", "data": trace.get("conversation_frame", {})}
-            except Exception as e:
-                yield {"type": "warning", "data": {"message": f"Memory trace update failed: {e}"}}
-        
-        # Final event
+            observed_context = list(context_plan.selected_context)
+            observed_context.extend({"source": "auto_context", **item} for item in auto_context_snippets)
+            _observe_kwargs = dict(
+                session_id=session_id,
+                turn_index=context_plan.turn_index,
+                question=body.message,
+                answer=answer_text,
+                selected_context=observed_context,
+                retrieved_triplets=context_plan.retrieved_triplets,
+                pinned_snippets=pinned_items,
+                source_sentences=(citations.get("snippets", []) if isinstance(citations, dict) else []),
+                search_plan={**(auto_context_plan or {}), "answer_mode": answer_mode, "prompt_hash": prompt_snapshot_hash, "prompt_context_hash": prompt_context_hash},
+                started_at=started_at,
+                token_budget=body.options.token_budget,
+            )
+            # Move observe_turn off the SSE critical path so HF NLI cold-starts
+            # (up to 45 s) do not block the stream between citations and final.
+            # Consistency warnings from this turn will surface in the next turn
+            # via memory retrieval, or can be fetched from /chat/memory/evidence-tables.
+            asyncio.create_task(policy.observe_turn(**_observe_kwargs))
+
+        # Final event ? emitted immediately after citations
         yield {"type": "final", "data": {"done": True, "session_id": session_id}}
     
     # Use SSE helper

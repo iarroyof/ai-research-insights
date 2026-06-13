@@ -85,11 +85,23 @@ def domain_alignment(question: str, answer: str, selected_context: List[Dict[str
     return max(0.0, min(1.0, overlap))
 
 
+GENERIC_MECHANISTIC_MARKERS = {
+    "mechanism", "pathway", "signaling", "pathogenesis", "crosstalk", "interaction",
+    "regulation", "cascade", "downstream", "upstream", "inhibition", "activation",
+}
+
+
 def off_topic_penalty(question: str, answer: str, selected_context: List[Dict[str, Any]]) -> float:
     q = set(terms(question))
-    asks_mechanistic = bool(q & MECHANISTIC_CONTEXT_TERMS) or "functional synergy" in (question or "").lower()
+    asks_mechanistic = (
+        bool(q & MECHANISTIC_CONTEXT_TERMS)
+        or "functional synergy" in (question or "").lower()
+        or bool(q & GENERIC_MECHANISTIC_MARKERS)
+    )
     asks_pharm = bool(q & {"drug", "dose", "therapy", "therapeutic", "pharmacological"})
-    if not asks_mechanistic or asks_pharm:
+    # Fix 6b: also skip penalty when pharmacological terms appear in the question itself
+    q_pharm_specific = bool(set(terms(question or "")) & MATH_PHARM_SYNERGY_TERMS)
+    if not asks_mechanistic or asks_pharm or q_pharm_specific:
         return 0.0
     answer_hits = len(set(terms(answer or "")) & MATH_PHARM_SYNERGY_TERMS)
     context_text = " ".join(
@@ -146,6 +158,68 @@ def detect_triplet_conflicts(
     return conflicts[:5]
 
 
+
+
+# ---------------------------------------------------------------------------
+# Per-step retrieval reward functions (ReasonRAG-style, WP-D)
+# ---------------------------------------------------------------------------
+
+def query_novelty(
+    current_query_terms: set,
+    previous_query_terms_per_level: list,
+) -> float:
+    """Fraction of terms in current_query not seen in any prior level query.
+
+    Returns 1.0 for the first query (no prior), 0.0 for an exact repeat.
+    """
+    if not previous_query_terms_per_level:
+        return 1.0
+    prior_union: set = set()
+    for s in previous_query_terms_per_level:
+        prior_union |= s
+    if not current_query_terms:
+        return 0.0
+    novel = current_query_terms - prior_union
+    return len(novel) / len(current_query_terms)
+
+
+def gap_closure_score(gap_spec_before: "Any", gap_spec_after: "Any") -> float:
+    """How much did this retrieval step reduce the missing entities set?
+
+    Accepts any duck-typed object with .missing_entities and .confirmed_entities.
+    Returns fraction of previously-missing entities now confirmed.
+    Returns 0.0 if gap_spec_before had nothing missing.
+    """
+    prev_missing = getattr(gap_spec_before, "missing_entities", set())
+    if not prev_missing:
+        return 0.0
+    confirmed_after = getattr(gap_spec_after, "confirmed_entities", set())
+    newly_confirmed = prev_missing & confirmed_after
+    return len(newly_confirmed) / len(prev_missing)
+
+
+def distractor_ratio(
+    snippets: list,
+    query_anchors: set,
+    gap_spec: "Any" = None,
+) -> float:
+    """Fraction of snippets with no anchor overlap and no gap-closing content.
+
+    High distractor_ratio indicates the retrieval level returned off-topic results.
+    """
+    if not snippets:
+        return 0.0
+    missing_entities = getattr(gap_spec, "missing_entities", set()) if gap_spec is not None else set()
+    distractors = 0
+    for s in snippets:
+        text_lower = (s.get("text") or s.get("snippet") or "").lower()
+        has_anchor = any(a in text_lower for a in query_anchors)
+        has_gap = any(e.lower() in text_lower for e in missing_entities)
+        if not has_anchor and not has_gap:
+            distractors += 1
+    return distractors / len(snippets)
+
+
 def reward_report(
     *,
     question: str,
@@ -158,6 +232,7 @@ def reward_report(
     search_plan: Dict[str, Any] | None = None,
     elapsed_sec: float,
     token_budget: int,
+    step_rewards: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     relevance = lexical_overlap(question, answer)
     support = context_support_score(answer, selected_context)
@@ -232,6 +307,13 @@ def reward_report(
         - 0.05 * latency_penalty
         - 0.05 * token_penalty
     )
+    if step_rewards:
+        _avg_gap = sum(s.get("gap_closure_score", 0.0) for s in step_rewards) / len(step_rewards)
+        _avg_dis = sum(s.get("distractor_ratio", 0.0) for s in step_rewards) / len(step_rewards)
+        _avg_nov = sum(s.get("query_novelty", 0.0) for s in step_rewards) / len(step_rewards)
+        score = max(0.0, min(1.0, score + 0.04 * _avg_gap - 0.04 * _avg_dis))
+    else:
+        _avg_gap = _avg_dis = _avg_nov = 0.0
     return {
         "score": round(max(0.0, min(1.0, score)), 4),
         "relevance_to_question": round(relevance, 4),
@@ -262,4 +344,7 @@ def reward_report(
         "unsupported_claim_penalty": round(unsupported_penalty, 4),
         "latency_penalty": round(latency_penalty, 4),
         "token_penalty": round(token_penalty, 4),
+        "avg_query_novelty": round(_avg_nov, 4),
+        "avg_gap_closure_score": round(_avg_gap, 4),
+        "avg_distractor_ratio": round(_avg_dis, 4),
     }

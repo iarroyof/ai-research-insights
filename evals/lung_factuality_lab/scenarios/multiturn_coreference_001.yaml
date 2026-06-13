@@ -1,0 +1,71 @@
+scenario_id: multiturn_coreference_001
+description: >
+  Multi-turn coreference resolution. User receives clarification options
+  (a/b/c style) from the system and replies with only option letters ("a and b").
+  The system must correctly resolve the intent, retrieve literature for BOTH
+  chosen options, and not return PD-L1 or other unrelated papers.
+
+query: >
+  Is there a link between fungal infections and lung cancer progression?
+
+session_context:
+  prior_turn_model_response: >
+    There are several mechanisms by which fungal infections might influence
+    lung cancer. Which aspect interests you most?
+    a) Immunosuppression enabling tumor escape
+    b) Mycotoxin-driven DNA damage and carcinogenesis
+    c) Microbiome dysbiosis affecting treatment efficacy
+
+expected_entities:
+  - fungal infection
+  - lung cancer
+  - immunosuppression
+  - mycotoxin
+  - carcinogenesis
+  - tumor microenvironment
+
+expected_not_present:
+  - PD-L1
+  - checkpoint inhibitor
+  - EGFR mutation
+  - ALK rearrangement
+
+gold_mechanisms:
+  - id: mech_fungal_immune_escape
+    description: Fungal-induced immunosuppression enables tumor immune escape
+    entities: [fungal infection, immunosuppression, lung cancer, tumor microenvironment]
+    supports: [fungal infection -> immunosuppression -> tumor immune escape]
+  - id: mech_mycotoxin_dna
+    description: Mycotoxins cause DNA damage leading to carcinogenesis
+    entities: [mycotoxin, DNA damage, carcinogenesis, lung cancer]
+    supports: [mycotoxin -> DNA damage -> lung cancer]
+
+trap_statements:
+  - id: trap_pdl1_conflation
+    text: "The user asking about 'a and b' options was asking about PD-L1 checkpoint blockade"
+    is_trap: true
+  - id: trap_wrong_entity
+    text: "The user reply 'a and b' should be interpreted as a BM25 query for the string 'a and b'"
+    is_trap: true
+
+reward_shape:
+  name: multiturn_coreference
+  weights:
+    factual_accuracy: 0.30
+    entity_coverage: 0.25
+    no_hallucination: 0.20
+    inter_turn_coreference: 0.15
+    context_poor_resolution: 0.10
+
+stage: multiturn_coreference_eval
+
+coreference_test:
+  user_reply: "a and b"
+  expected_resolution:
+    intent: prior_context
+    must_contain_entities:
+      - immunosuppression
+      - mycotoxin
+    must_not_contain:
+      - PD-L1
+      - EGFR

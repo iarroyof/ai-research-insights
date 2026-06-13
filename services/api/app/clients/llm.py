@@ -42,6 +42,19 @@ class LLMClient:
         match = re.search(r"nvapi-[^\s]+", value or "")
         return match.group(0) if match else (value or "").strip()
 
+    def _agent_provider_config(self, agent_name: str) -> dict:
+        """Per-agent NIM model/reasoning overrides from settings.llm.agent_models."""
+        overrides = (self.settings.agent_models or {}).get(agent_name) or {}
+        if not overrides:
+            return {}
+        return {
+            "provider": overrides.get("provider"),
+            "model": overrides.get("model"),
+            "max_tokens": overrides.get("max_tokens"),
+            "reasoning_effort": overrides.get("reasoning_effort"),
+            "enable_thinking": overrides.get("enable_thinking"),
+        }
+
     def _completion_payload(
         self,
         messages: list[dict],
@@ -51,6 +64,8 @@ class LLMClient:
         stream: bool,
         include_optional: bool = True,
         provider: str | None = None,
+        reasoning_effort: str | None = None,
+        enable_thinking: bool | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model,
@@ -61,15 +76,23 @@ class LLMClient:
         if include_optional:
             payload["temperature"] = self.settings.temperature
             payload["top_p"] = self.settings.top_p
-            if provider == "nvidia":
-                if self.settings.nvidia_reasoning_effort:
-                    payload["reasoning_effort"] = self.settings.nvidia_reasoning_effort
-                if self.settings.nvidia_enable_thinking is not None:
-                    payload["extra_body"] = {
-                        "chat_template_kwargs": {
-                            "enable_thinking": self.settings.nvidia_enable_thinking,
-                        }
-                    }
+            effort = reasoning_effort or self.settings.nvidia_reasoning_effort
+            if provider == "nvidia" and effort:
+                payload["reasoning_effort"] = effort
+        # chat_template_kwargs is REQUIRED by thinking-capable NVIDIA models
+        # (e.g. Nemotron Super) in every request ? send it even on the stripped
+        # retry call (include_optional=False) to avoid a second 400 round-trip.
+        # Auto-detect: if nvidia_enable_thinking is not explicitly set but the
+        # model name contains "nemotron-super", default to enable_thinking=False
+        # (non-thinking / standard chat mode, safe for all request sizes).
+        if provider == "nvidia":
+            _thinking = enable_thinking if enable_thinking is not None else self.settings.nvidia_enable_thinking
+            if _thinking is None and "nemotron-super" in (model or "").lower():
+                _thinking = False
+            if _thinking is not None:
+                payload["chat_template_kwargs"] = {
+                    "enable_thinking": _thinking,
+                }
         return payload
 
     def _headers_for_provider(self, provider: str | None, cfg: dict[str, Any]) -> dict[str, str]:
@@ -167,9 +190,12 @@ class LLMClient:
             )
 
         presets = [
+            "nvidia/nemotron-3-ultra-550b-a55b",
+            "nvidia/nemotron-3-super-120b-a12b",
+            "nvidia/nemotron-3-nano-30b-a3b",
             "nvidia/llama-3.3-nemotron-super-49b-v1.5",
             "nvidia/llama-3.1-nemotron-70b-instruct",
-            "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+            "mistralai/mistral-nemotron",
             "meta/llama-3.1-8b-instruct",
         ]
         for model_id in presets:
@@ -206,9 +232,16 @@ class LLMClient:
         provider: str | None = None,
         model: str | None = None,
         api_format: str | None = None,
+        agent: str | None = None,
     ):
-        provider = provider or self.settings.chat_provider or "local"
+        agent_cfg = self._agent_provider_config(agent) if agent else {}
+        provider = provider or agent_cfg.get("provider") or self.settings.chat_provider or "local"
+        model = model or agent_cfg.get("model")
+        reasoning_effort = agent_cfg.get("reasoning_effort")
+        enable_thinking = agent_cfg.get("enable_thinking")
         cfg = self._provider_config(provider, model=model, api_format=api_format)
+        if agent_cfg.get("max_tokens"):
+            cfg["max_tokens"] = agent_cfg["max_tokens"]
         api_format = cfg.get("api_format", "openai_chat")
         url = f"{cfg['base_url']}/chat/completions"
         headers = self._headers_for_provider(provider, cfg)
@@ -219,6 +252,8 @@ class LLMClient:
             stream=True,
             include_optional=True,
             provider=provider,
+            reasoning_effort=reasoning_effort,
+            enable_thinking=enable_thinking,
         )
         if api_format == "anthropic_messages":
             url = f"{cfg['base_url']}/messages"
@@ -229,7 +264,7 @@ class LLMClient:
                 stream=True,
                 include_optional=True,
             )
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=self.settings.provider_timeout_sec) as client:
             stream = client.stream("POST", url, json=payload, headers=headers)
             async with stream as r:
                 if r.status_code in (400, 422):
@@ -250,6 +285,8 @@ class LLMClient:
                             stream=True,
                             include_optional=False,
                             provider=provider,
+                            reasoning_effort=reasoning_effort,
+                            enable_thinking=enable_thinking,
                         )
                     stream = client.stream("POST", url, json=payload, headers=headers)
                     async with stream as retry:
@@ -292,6 +329,7 @@ class LLMClient:
         model: str | None = None,
         api_format: str | None = None,
         max_tokens: int | None = None,
+        agent: str | None = None,
     ) -> str:
         """
         Non-streaming completion for policy/reflection calls.
@@ -300,7 +338,12 @@ class LLMClient:
         schemas differ. We first send configured optional controls, then retry
         without them when a model rejects unexpected arguments.
         """
-        provider = provider or self.settings.context_manager_provider or "local"
+        agent_cfg = self._agent_provider_config(agent) if agent else {}
+        provider = provider or agent_cfg.get("provider") or self.settings.context_manager_provider or "local"
+        model = model or agent_cfg.get("model")
+        max_tokens = max_tokens or agent_cfg.get("max_tokens")
+        reasoning_effort = agent_cfg.get("reasoning_effort")
+        enable_thinking = agent_cfg.get("enable_thinking")
         cfg = self._provider_config(provider, model=model, api_format=api_format)
         api_format = cfg.get("api_format", "openai_chat")
         url = f"{cfg['base_url']}/chat/completions"
@@ -312,6 +355,8 @@ class LLMClient:
             stream=False,
             include_optional=True,
             provider=provider,
+            reasoning_effort=reasoning_effort,
+            enable_thinking=enable_thinking,
         )
         if api_format == "anthropic_messages":
             url = f"{cfg['base_url']}/messages"
@@ -323,7 +368,7 @@ class LLMClient:
                 include_optional=True,
             )
 
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=self.settings.provider_timeout_sec) as client:
             resp = await client.post(url, json=payload, headers=headers)
             if resp.status_code in (400, 422):
                 if api_format == "anthropic_messages":
@@ -342,6 +387,8 @@ class LLMClient:
                         stream=False,
                         include_optional=False,
                         provider=provider,
+                        reasoning_effort=reasoning_effort,
+                        enable_thinking=enable_thinking,
                     )
                 resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()

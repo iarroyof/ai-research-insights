@@ -1,8 +1,10 @@
+import asyncio
 import json
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 from app.config import settings
@@ -91,7 +93,7 @@ class FakeContextPolicy:
     def __init__(self, tenant):
         self.tenant = tenant
 
-    async def plan(self, *, session_id, message, allow_web_search, confidence_min):
+    async def plan(self, *, session_id, message, allow_web_search, confidence_min, evidence_assembly=None, gap_spec=None):
         Capture.allow_web_search = allow_web_search
         return SimpleNamespace(
             turn_index=0,
@@ -135,6 +137,30 @@ class FakeLLMClient:
         Capture.llm_kwargs = kwargs
         yield json.dumps({"choices": [{"delta": {"content": "grounded answer"}}]})
         yield "[DONE]"
+
+
+class FailingLLMClient:
+    async def chat_stream(self, messages, **kwargs):
+        request = httpx.Request("POST", "https://integrate.api.nvidia.com/v1/chat/completions")
+        response = httpx.Response(404, request=request)
+        raise httpx.HTTPStatusError("provider unavailable", request=request, response=response)
+        yield "[DONE]"
+
+
+class EmptyLLMClient:
+    async def chat_stream(self, messages, **kwargs):
+        Capture.llm_messages = messages
+        Capture.llm_kwargs = kwargs
+        yield json.dumps({"choices": [{"delta": {}}]})
+        yield "[DONE]"
+
+
+class HangingLLMClient:
+    async def chat_stream(self, messages, **kwargs):
+        Capture.llm_messages = messages
+        Capture.llm_kwargs = kwargs
+        await asyncio.sleep(1)
+        yield json.dumps({"choices": [{"delta": {"content": "late answer"}}]})
 
 
 class ChatAutoContextTests(unittest.TestCase):
@@ -202,6 +228,8 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertEqual(citations["snippets"][0]["source_sentence_id"], "s1")
         self.assertEqual(citations["snippets"][0]["bm25_score"], 2.5)
         self.assertEqual(citations["generation_telemetry"]["answer_mode"], "direct_answer")
+        self.assertEqual(citations["retrieval_pipeline"]["version"], "search_retrieval_pipeline:v1")
+        self.assertEqual(citations["retrieval_pipeline"]["sequence"][0]["step"], "frame_interpretation")
         self.assertEqual(citations["auto_context"]["prompt_hash"], citations["generation_telemetry"]["prompt_hash"])
         self.assertIn("prompt_context_hash", citations["generation_telemetry"])
         self.assertEqual(Capture.observed_search_plan["answer_mode"], "direct_answer")
@@ -213,6 +241,99 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertIn("plausible", Capture.llm_messages[0]["content"])
         self.assertIn("missing evidence", Capture.llm_messages[0]["content"])
 
+    def test_provider_http_error_yields_warning_fallback_and_final(self):
+        with patch("app.routers.chat.build_auto_context", side_effect=fake_build_auto_context), patch(
+            "app.routers.chat.build_prompt_and_citations", side_effect=fake_build_prompt_and_citations
+        ), patch("app.routers.chat.ContextPolicy", FakeContextPolicy), patch("app.routers.chat.LLMClient", FailingLLMClient):
+            response = self.client.post(
+                "/chat/",
+                headers=self.headers,
+                json={
+                    "message": "Does PD-L1 predict response?",
+                    "items": [],
+                    "options": {
+                        "allow_memory": True,
+                        "allow_auto_context": True,
+                        "allow_web_search": True,
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        events = self._events(response)
+        warning = next(item["data"] for item in events if item["type"] == "warning")
+        answer = "".join(item["data"] for item in events if item["type"] == "token")
+        citations = next(item["data"] for item in events if item["type"] == "citations")
+        final = next(item["data"] for item in events if item["type"] == "final")
+
+        self.assertEqual(warning["error_type"], "HTTPStatusError")
+        self.assertEqual(warning["status_code"], 404)
+        self.assertIn("retrieved evidence state", answer)
+        self.assertEqual(citations["generation_telemetry"]["provider_error"]["status_code"], 404)
+        self.assertTrue(final["done"])
+
+    def test_empty_provider_stream_yields_fallback_and_telemetry(self):
+        with patch("app.routers.chat.build_auto_context", side_effect=fake_build_auto_context), patch(
+            "app.routers.chat.build_prompt_and_citations", side_effect=fake_build_prompt_and_citations
+        ), patch("app.routers.chat.ContextPolicy", FakeContextPolicy), patch("app.routers.chat.LLMClient", EmptyLLMClient):
+            response = self.client.post(
+                "/chat/",
+                headers=self.headers,
+                json={
+                    "message": "Does PD-L1 predict response?",
+                    "items": [],
+                    "options": {
+                        "allow_memory": True,
+                        "allow_auto_context": True,
+                        "allow_web_search": True,
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        events = self._events(response)
+        answer = "".join(item["data"] for item in events if item["type"] == "token")
+        citations = next(item["data"] for item in events if item["type"] == "citations")
+        final = next(item["data"] for item in events if item["type"] == "final")
+
+        self.assertIn("retrieved evidence state", answer)
+        self.assertIn("empty_stream_fallback", citations["generation_telemetry"])
+        self.assertTrue(final["done"])
+
+    def test_provider_generation_timeout_yields_warning_fallback_and_final(self):
+        old_timeout = settings.llm.provider_timeout_sec
+        settings.llm.provider_timeout_sec = 0.01
+        try:
+            with patch("app.routers.chat.build_auto_context", side_effect=fake_build_auto_context), patch(
+                "app.routers.chat.build_prompt_and_citations", side_effect=fake_build_prompt_and_citations
+            ), patch("app.routers.chat.ContextPolicy", FakeContextPolicy), patch("app.routers.chat.LLMClient", HangingLLMClient):
+                response = self.client.post(
+                    "/chat/",
+                    headers=self.headers,
+                    json={
+                        "message": "Does PD-L1 predict response?",
+                        "items": [],
+                        "options": {
+                            "allow_memory": True,
+                            "allow_auto_context": True,
+                            "allow_web_search": True,
+                        },
+                    },
+                )
+        finally:
+            settings.llm.provider_timeout_sec = old_timeout
+
+        self.assertEqual(response.status_code, 200)
+        events = self._events(response)
+        warning = next(item["data"] for item in events if item["type"] == "warning")
+        answer = "".join(item["data"] for item in events if item["type"] == "token")
+        citations = next(item["data"] for item in events if item["type"] == "citations")
+        final = next(item["data"] for item in events if item["type"] == "final")
+
+        self.assertEqual(warning["error_type"], "TimeoutError")
+        self.assertIn("retrieved evidence state", answer)
+        self.assertEqual(citations["generation_telemetry"]["provider_error"]["error_type"], "TimeoutError")
+        self.assertTrue(final["done"])
 
     def test_diagnostic_trace_mode_skips_auto_context_and_extra_retrieval(self):
         with patch("app.routers.chat.build_auto_context", side_effect=fake_build_auto_context), patch(
@@ -238,11 +359,35 @@ class ChatAutoContextTests(unittest.TestCase):
         self.assertIn("source sentence IDs", "\n".join(m["content"] for m in Capture.llm_messages))
 
     def test_answer_mode_detector_selects_mode_contracts(self):
-        from app.routers.chat import _answer_mode, _post_generation_expansion_guard
+        from app.routers.chat import _answer_mode, _hold_generation_for_clarification, _post_generation_expansion_guard
 
         self.assertEqual(_answer_mode("Give me a one-paragraph version for a novice user.", {}, correction_only_turn=False), "novice_rewrite")
         self.assertEqual(_answer_mode("Is this phrase accurate: HGF reduces MET?", {}, correction_only_turn=False), "phrase_evaluation")
         self.assertEqual(_answer_mode("From now on, stay within the TME scope.", {}, correction_only_turn=True), "correction_acknowledgement")
+        self.assertFalse(
+            _hold_generation_for_clarification(
+                {
+                    "clarification_recommended": True,
+                    "level_result_counts": {"title": 1, "sentence": 3},
+                    "evidence_puzzle": {
+                        "edge_support_status": "missing",
+                        "missing_nodes": [],
+                    },
+                }
+            )
+        )
+        self.assertTrue(
+            _hold_generation_for_clarification(
+                {
+                    "clarification_recommended": True,
+                    "level_result_counts": {"title": 1, "sentence": 3},
+                    "evidence_puzzle": {
+                        "edge_support_status": "missing",
+                        "missing_nodes": ["MET/c-MET"],
+                    },
+                }
+            )
+        )
 
         repaired, trace = _post_generation_expansion_guard(
             "This adds a named mediator and a specific downstream outcome not present in the evidence.",

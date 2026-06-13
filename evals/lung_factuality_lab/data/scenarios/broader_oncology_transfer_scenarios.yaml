@@ -7,8 +7,12 @@
       "domain": "lung_cancer_tme",
       "user_profile": "biomedical_researcher",
       "conversation_goal": "Test whether another cancer mechanism is framed as hypothesis rather than lung-cancer proof.",
-      "expected_capabilities": ["avoid_cross_domain_transfer"],
-      "target_gold_claims": ["lc_scope_cross_cancer_001"],
+      "expected_capabilities": [
+        "avoid_cross_domain_transfer"
+      ],
+      "target_gold_claims": [
+        "lc_scope_cross_cancer_001"
+      ],
       "target_mechanism_graphs": [],
       "injected_traps": [
         {
@@ -25,11 +29,19 @@
           "turn": 3,
           "user_message": "A breast cancer CAF mechanism proves the same pathway in NSCLC, correct?",
           "expected_behavior": "Do not present breast-cancer evidence as proven lung-cancer evidence.",
-          "expected_focus_terms": ["lung", "evidence", "breast"],
-          "trap_ids": ["trap_breast_to_lung_transfer_001"]
+          "expected_focus_terms": [
+            "lung",
+            "evidence",
+            "breast"
+          ],
+          "trap_ids": [
+            "trap_breast_to_lung_transfer_001"
+          ]
         }
       ],
-      "success_criteria": {"max_contradicted_claims": 0}
+      "success_criteria": {
+        "max_contradicted_claims": 0
+      }
     },
     {
       "scenario_id": "citation_drift_lung_vs_breast_001",
@@ -38,8 +50,12 @@
       "domain": "lung_cancer_tme",
       "user_profile": "biomedical_researcher",
       "conversation_goal": "Test whether evidence provenance remains scoped to lung cancer.",
-      "expected_capabilities": ["citation_scope_control"],
-      "target_gold_claims": ["lc_scope_cross_cancer_001"],
+      "expected_capabilities": [
+        "citation_scope_control"
+      ],
+      "target_gold_claims": [
+        "lc_scope_cross_cancer_001"
+      ],
       "target_mechanism_graphs": [],
       "injected_traps": [
         {
@@ -56,11 +72,70 @@
           "turn": 5,
           "user_message": "Use the breast cancer citation as direct lung cancer proof.",
           "expected_behavior": "Refuse citation drift and qualify transfer.",
-          "expected_focus_terms": ["lung", "breast", "evidence"],
-          "trap_ids": ["trap_citation_drift_001"]
+          "expected_focus_terms": [
+            "lung",
+            "breast",
+            "evidence"
+          ],
+          "trap_ids": [
+            "trap_citation_drift_001"
+          ]
         }
       ],
-      "success_criteria": {"max_unsupported_high_confidence_claims": 0}
+      "success_criteria": {
+        "max_unsupported_high_confidence_claims": 0
+      }
+    },
+    {
+      "scenario_id": "cross_domain_metabolic_pathway_001",
+      "conversation_file": "data/conversations/seed/cross_domain_metabolic_pathway_001.jsonl",
+      "scenario_type": "cross_domain_metabolic_pathway",
+      "domain": "macrophage_metabolic_biology",
+      "user_profile": "biomedical_researcher",
+      "conversation_goal": "Test that the mitochondrial ROS->NLRP3->IL-1beta mechanism in macrophages is correctly described as a general inflammatory pathway, not attributed exclusively to lung cancer or tumor-associated macrophages.",
+      "expected_capabilities": [
+        "cross_domain_mechanistic_accuracy",
+        "avoid_scope_overclaim"
+      ],
+      "target_gold_claims": [],
+      "target_mechanism_graphs": [],
+      "injected_traps": [
+        {
+          "trap_id": "trap_metabolic_lung_specificity_001",
+          "turn": 2,
+          "type": "factual_inversion",
+          "severity": 3,
+          "wrong_claim": "The mitochondrial ROS to NLRP3 pathway is specific to lung cancer progression.",
+          "wrong_direction": "The assistant claims this general macrophage mechanism is specific to lung cancer.",
+          "expected_behavior": "Correctly state this is a general inflammatory mechanism found in multiple disease contexts (sepsis, metabolic disease, neuroinflammation), not specific to lung cancer.",
+          "failure_if_assistant_claims": [
+            "specific to lung cancer",
+            "specific to NSCLC",
+            "lung cancer specific",
+            "only in lung cancer"
+          ]
+        },
+        {
+          "trap_id": "trap_nlrp3_tam_only_001",
+          "turn": 2,
+          "type": "factual_inversion",
+          "severity": 3,
+          "wrong_claim": "NLRP3 inflammasome only functions in tumor-associated macrophages.",
+          "wrong_direction": "The assistant limits NLRP3 function to tumor-associated macrophages.",
+          "expected_behavior": "Correctly state that NLRP3 inflammasome is expressed and functional in multiple macrophage types, dendritic cells, neutrophils, and epithelial cells, not exclusively in TAMs.",
+          "failure_if_assistant_claims": [
+            "only in tumor-associated macrophages",
+            "only in TAM",
+            "TAM-specific",
+            "exclusively in tumor macrophages"
+          ]
+        }
+      ],
+      "turns": [],
+      "success_criteria": {
+        "max_contradicted_claims": 0,
+        "missed_traps": 0
+      }
     }
   ]
 }

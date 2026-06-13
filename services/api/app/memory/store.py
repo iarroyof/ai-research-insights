@@ -689,6 +689,7 @@ class MemoryStore:
         turn_index: int,
         reward_score: float = 0.0,
         shared: bool = False,
+        user_id: str | None = None,  # WP-F-2
     ) -> None:
         await self.ensure_index()
         updates = build_idea_updates(
@@ -699,6 +700,18 @@ class MemoryStore:
             reward_score=reward_score,
             shared=shared,
         )
+        # WP-F-2: also write user-scope IdeaRecords when user_id provided
+        if user_id:
+            user_updates = build_idea_updates(
+                tenant=self.tenant,
+                session_id=session_id,
+                texts=texts,
+                turn_index=turn_index,
+                reward_score=reward_score,
+                shared=False,
+                scope_override=f"user_{user_id}",
+            )
+            updates = updates + user_updates
         if not updates:
             return
 
@@ -722,7 +735,7 @@ class MemoryStore:
         except Exception as e:
             print(f"[WARN] MemoryStore.update_idea_index failed: {e}")
 
-    async def search_ideas(self, session_id: str, query: str, k: int) -> List[Dict[str, Any]]:
+    async def search_ideas(self, session_id: str, query: str, k: int, user_id: str | None = None) -> List[Dict[str, Any]]:  # WP-F-2
         def sync() -> List[Dict[str, Any]]:
             body = {
                 "size": max(20, k * 4),
@@ -746,7 +759,7 @@ class MemoryStore:
                         ],
                         "filter": [
                             {"term": {"doc_type": "idea"}},
-                            {"terms": {"scope": [session_id, "shared"]}},
+                            {"terms": {"scope": ([session_id, f"user_{user_id}", "shared"] if user_id else [session_id, "shared"])}},  # WP-F-2
                         ],
                     }
                 },

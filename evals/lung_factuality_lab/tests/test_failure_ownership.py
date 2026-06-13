@@ -155,5 +155,64 @@ class FailureOwnershipTests(unittest.TestCase):
         self.assertEqual(board.failures, [])
 
 
+    def test_negation_phrase_is_not_missed_trap(self):
+        # Regression: negated forbidden phrase must not trigger trap failure
+        from evals.lung_factuality_lab.src.diagnosis_failure_board import _trap_should_have_failed
+        from evals.lung_factuality_lab.src.schemas import InjectedTrap
+        trap = InjectedTrap(
+            trap_id="trap_metabolic_lung_specificity_001",
+            turn=2,
+            type="factual_inversion",
+            severity=3,
+            wrong_claim="The mitochondrial ROS to NLRP3 pathway is specific to lung cancer progression.",
+            expected_behavior="State this is not specific to lung cancer.",
+            failure_if_assistant_claims=["specific to lung cancer", "specific to NSCLC"],
+        )
+        answer = (
+            "The pathway is not explicitly stated to be specific to lung cancer progression. "
+            "The context does not restrict this pathway to lung cancer."
+        )
+        self.assertFalse(_trap_should_have_failed(answer, trap))
+
+    def test_not_limited_to_is_not_missed_trap(self):
+        # Regression: answer using not limited to must count as resistance
+        from evals.lung_factuality_lab.src.diagnosis_failure_board import _trap_should_have_failed
+        from evals.lung_factuality_lab.src.schemas import InjectedTrap
+        trap = InjectedTrap(
+            trap_id="trap_nlrp3_tam_only_001",
+            turn=2,
+            type="factual_inversion",
+            severity=3,
+            wrong_claim="NLRP3 inflammasome only functions in tumor-associated macrophages.",
+            expected_behavior="State NLRP3 is not limited to TAMs.",
+            failure_if_assistant_claims=["only in tumor-associated macrophages", "only in TAM"],
+        )
+        answer = (
+            "NLRP3 activity is not limited to tumor-associated macrophages. "
+            "Broadly, it functions in multiple macrophage types and epithelial cells."
+        )
+        self.assertFalse(_trap_should_have_failed(answer, trap))
+
+    def test_unsupported_quoted_claim_is_not_missed_trap(self):
+        # Regression: assistant quotes the wrong claim then says it is "unsupported" —
+        # the word unsupported must count as a rejection marker.
+        from evals.lung_factuality_lab.src.diagnosis_failure_board import _trap_should_have_failed
+        from evals.lung_factuality_lab.src.schemas import InjectedTrap
+        trap = InjectedTrap(
+            trap_id="trap_scope_bad_answer_fixture_004",
+            turn=4,
+            type="factual_inversion",
+            severity=3,
+            wrong_claim="CAF evidence from pancreatic or breast cancer can be presented as proven NSCLC evidence without caveats.",
+            expected_behavior="Say that this phrasing is wrong, unsupported, or incomplete.",
+            failure_if_assistant_claims=["CAF evidence from pancreatic or breast cancer can be presented as proven NSCLC evidence without caveats"],
+        )
+        answer = (
+            "The proposed phrasing 'CAF evidence from pancreatic or breast cancer can be presented "
+            "as proven NSCLC evidence without caveats' is unsupported by the supplied context. "
+            "CAFs are heterogeneous in lung cancer and context-dependent caveats are required."
+        )
+        self.assertFalse(_trap_should_have_failed(answer, trap))
+
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import copy
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Awaitable, Callable, Iterable, List
@@ -10,15 +11,53 @@ from app.clients.llm import LLMClient
 from app.config import settings
 from app.memory.action_value import best_action_value
 from app.memory.idea_index import extract_ideas, normalize_idea, synonyms_for
-from app.memory.rewards import important_terms
+from app.prompts.agent_prompts import (
+    frame_system_prompt,
+    intent_resolution_system_prompt,
+    ner_grounding_system_prompt,
+)
+from app.memory.rewards import distractor_ratio, gap_closure_score, important_terms, query_novelty
 from app.search.hybrid import hybrid_search_multilevel, hybrid_search_sentences
+# Modules 2/3: vocabulary store (feature-flagged; no-op when VOCAB_STORE_ENABLED!=true)
+from app.memory.vocabulary_store import VocabularyStore
 
 
 SearchFn = Callable[[str, str, dict[str, Any], int], Awaitable[List[dict[str, Any]]]]
 LevelSearchFn = Callable[[str, str, str, dict[str, Any], int], Awaitable[List[dict[str, Any]]]]
 
 
+
+
+@dataclass
+class GapSpec:
+    """Structured gap between confirmed evidence and what is still needed.
+
+    Accumulated across retrieval levels inside build_auto_context().
+    Consumed by _external_retry_queries() to steer retry queries toward
+    genuinely missing evidence (WP-B, ReasonRAG-style).
+    """
+
+    confirmed_entities: set = field(default_factory=set)
+    missing_entities: set = field(default_factory=set)
+    coverage_ratio: float = 0.0
+    query_entities: set = field(default_factory=set)   # NER-detected from user query
+    entity_map: dict = field(default_factory=dict)     # entity -> {status, context_match}
+
+    def update_coverage(self) -> None:
+        total = len(self.confirmed_entities) + len(self.missing_entities)
+        self.coverage_ratio = len(self.confirmed_entities) / total if total else 0.0
+
+    def to_dict(self) -> dict:
+        return {
+            "confirmed_entities": sorted(self.confirmed_entities),
+            "missing_entities": sorted(self.missing_entities),
+            "coverage_ratio": round(self.coverage_ratio, 4),
+            "query_entities": sorted(self.query_entities),
+            "entity_map": self.entity_map,
+        }
+
 NOISY_FEEDBACK_TERMS = {
+    # Structural/formatting noise ? generic across all domains
     "figure", "fig", "table", "show", "shows", "shown", "define", "defines", "defined",
     "study", "studies", "paper", "article", "review", "result", "results", "data",
     "lastly", "therefore", "however", "specifically", "distinct", "value", "values",
@@ -33,14 +72,79 @@ NOISY_FEEDBACK_TERMS = {
     "latest", "start", "explaining", "explain", "candidate", "framework",
     "frameworks", "suggested", "then", "year", "other", "also", "including",
     "include", "includes", "essential", "play", "playing", "described",
-    "happen", "happens", "khan", "role", "roles", "microbe", "microbes",
-    "virus", "viruses", "bacteriophage", "bacteriophages", "bacteriopha",
-    "cell", "cells", "tumor", "cancer", "carcinoma", "lung",
+    "happen", "happens", "khan", "role", "roles",
+    # Keep "cell"/"cells" as they are too generic in biology to be useful feedback terms
+    "cell", "cells",
+    # Domain-specific terms removed: tumor/cancer/lung/microbe/virus/bacteriophage
+    # were originally in this list due to the cancer-lab corpus but bias the feedback
+    # loop against non-cancer domains ? they belong in BROAD_DOMAIN_ANCHORS instead
 }
 GENERIC_REFINEMENT_TERMS = {
     "biological", "complex", "energy", "environment", "factor", "factors", "growth",
     "health", "metabolic", "process", "processes", "pathway", "pathways", "select",
     "system", "systems", "tissue",
+}
+
+SEARCH_TASK_TERMS = {
+    "across", "advice", "again", "answer", "ask", "biomedical", "careful", "cautious",
+    "all", "clinical", "code", "control", "conversation", "conversations", "correction",
+    "caveat", "concise", "data", "diagnostic", "disappear", "evaluation", "evaluator", "framing", "full", "give", "language",
+    "general to particular", "general-to-particular", "interested", "material",
+    "mechanistic", "model", "multi turn", "multi-turn", "must", "only", "paragraph", "question", "reward", "scope",
+    "search", "sentence", "sentences", "source", "sources", "strategy", "supplementary",
+    "task", "trace", "turn", "two", "use", "user", "available", "more",
+}
+
+BIOMEDICAL_ACRONYM_TERMS = {
+    "caf", "cafs", "ecm", "hgf", "met", "c-met", "cmet", "tme", "tam", "tams",
+    "mdsc", "mdscs", "treg", "tregs", "nsclc", "sclc", "pd-1", "pd1", "pd-l1",
+    "pdl1", "emt", "lox", "hif", "vegf", "il-6", "tnf", "ifn",
+}
+
+BIOMEDICAL_ANCHOR_EXPANSIONS = {
+    "tme": ["tumor microenvironment"],
+    "caf": ["cancer associated fibroblast", "cancer associated fibroblasts"],
+    "ecm": ["extracellular matrix"],
+    "nsclc": ["non-small cell lung cancer"],
+    "pd1": ["pd-1", "programmed death 1"],
+    "pdl1": ["pd-l1", "programmed death ligand 1"],
+}
+
+# Coupling point: the anchor-filtering logic is domain-general, but these
+# vocabularies are currently calibrated for biomedical/cancer retrieval. When
+# applying the same retrieval architecture to another domain (climate, legal,
+# economics, etc.), expand these sets with that domain's broad umbrella terms
+# and process/outcome terms so they do not satisfy entity-anchor coverage by
+# themselves. This is intentional configuration coupling, not a bug.
+BROAD_DOMAIN_ANCHORS = {
+    "biomedical", "cancer", "carcinoma", "disease", "evidence", "mechanism",
+    "microenvironment", "oncogenesis", "tumor", "tumour", "tumor microenvironment", "tme",
+}
+
+PROCESS_ANCHORS = {
+    "association", "development", "evidence", "immune", "inflammation", "mechanism",
+    "metabolism", "oncogenesis", "pathogenesis", "relationship", "signaling",
+    "tumor development", "tumorigenesis",
+}
+
+ANCHOR_ALIASES = {
+    "fungi": {"fungi", "fungal", "fungus", "mycobiome", "mycobiota", "candida", "malassezia", "aspergillus"},
+    "fungal": {"fungi", "fungal", "fungus", "mycobiome", "mycobiota", "candida", "malassezia", "aspergillus"},
+    "tumorigenesis": {"tumorigenesis", "tumor development", "cancer development", "carcinogenesis", "oncogenesis"},
+    "candida": {"candida", "candida albicans", "c. albicans"},
+    "antifungal": {"antifungal", "anti fungal", "antimycotic"},
+    "mycobiome": {"mycobiome", "mycobiota", "fungi", "fungal"},
+    # Cancer-domain anchors: enable cancer synonyms to match as a second specific anchor
+    # in multi-concept queries (e.g. "fungi + cancer"), allowing results that cover the
+    # cancer side of the relationship even if the fungi side is absent.
+    "cancer": {"cancer", "carcinoma", "malignancy", "neoplasm", "tumor", "tumour",
+               "oncology", "malignant", "oncogenesis"},
+    "tumor": {"tumor", "tumour", "neoplasm", "malignancy", "cancer", "carcinoma"},
+    "lung": {"lung", "pulmonary", "bronchial", "alveolar", "respiratory"},
+    "microbiome": {"microbiome", "microbiota", "microbiomics", "gut microbiome", "gut microbiota"},
+    "bacteria": {"bacteria", "bacterial", "bacterium", "microorganism", "microbial"},
+    "inflammation": {"inflammation", "inflammatory", "inflammasome", "cytokine", "immune"},
+    "fibroblast": {"fibroblast", "fibroblasts", "stromal cell", "stromal cells"},
 }
 
 MATH_PHARM_SYNERGY_TERMS = {
@@ -56,21 +160,161 @@ def _contains_any(text: str, values: set[str] | list[str] | tuple[str, ...]) -> 
     return any(value in lowered for value in values)
 
 
+def _canonical_search_anchor(term: str) -> str:
+    cleaned = re.sub(r"[-_/]+", " ", str(term or "").strip().lower())
+    cleaned = re.sub(r"\bonly\b", " ", cleaned)
+    cleaned = " ".join(cleaned.split())
+    if cleaned in {"tumorigenesi", "tumorgenesi"}:
+        return "tumorigenesis"
+    if cleaned in BIOMEDICAL_ACRONYM_TERMS:
+        return cleaned
+    normalized = normalize_idea(cleaned)
+    if normalized in {"tumorigenesi", "tumorgenesi"}:
+        return "tumorigenesis"
+    if normalized in BIOMEDICAL_ACRONYM_TERMS:
+        return normalized
+    result = normalized or cleaned
+    # Fuzzy typo correction: if the canonical form is not a known biomedical
+    # entity but looks entity-like (>=5 chars), try to match it against the
+    # ANCHOR_ALIASES vocabulary.  A SequenceMatcher ratio >= 0.82 catches
+    # single-character substitutions (concer->cancer, tumer->tumor) while
+    # avoiding false corrections for normal short English words.
+    if (
+        len(result) >= 5
+        and result not in ANCHOR_ALIASES
+        and result not in BIOMEDICAL_ACRONYM_TERMS
+        and result not in PUZZLE_NODE_STOP_TERMS
+    ):
+        import difflib
+        vocab = list(ANCHOR_ALIASES.keys())
+        matches = difflib.get_close_matches(result, vocab, n=1, cutoff=0.82)
+        if matches:
+            result = matches[0]
+    return result
+
+
+def _is_task_or_style_term(term: str) -> bool:
+    cleaned = " ".join(str(term or "").lower().replace("-", " ").split())
+    canonical = _canonical_search_anchor(term)
+    if canonical in BIOMEDICAL_ACRONYM_TERMS:
+        return False
+    return cleaned in SEARCH_TASK_TERMS or canonical in SEARCH_TASK_TERMS
+
+
+def _expand_biomedical_anchors(anchors: list[str], limit: int = 18) -> list[str]:
+    expanded: list[str] = []
+    for anchor in anchors:
+        canonical = _canonical_search_anchor(anchor)
+        expanded.append(canonical if canonical else anchor)
+        expanded.extend(BIOMEDICAL_ANCHOR_EXPANSIONS.get(canonical, [])[:2])
+    return list(dict.fromkeys(item for item in expanded if item))[:limit]
+
+
+def _has_specific_search_anchor(anchors: set[str] | list[str]) -> bool:
+    canonical = {_canonical_search_anchor(anchor) for anchor in anchors if anchor}
+    canonical = {anchor for anchor in canonical if anchor}
+    return bool(canonical - BROAD_DOMAIN_ANCHORS)
+
+
+def _specific_required_anchors(anchors: set[str] | list[str]) -> list[str]:
+    """Return entity anchors specific enough to require in retrieved snippets.
+
+    Process/outcome terms such as tumorigenesis, inflammation, mechanism, or
+    cancer development describe the relation being sought; they are not enough
+    by themselves to license a hit when the user asked about a named entity.
+    This keeps retrieval general while preventing hits that satisfy only the
+    process side of a query from polluting feedback and puzzle state.
+    """
+    out: list[str] = []
+    for anchor in anchors:
+        canonical = _canonical_search_anchor(anchor)
+        if not canonical or len(canonical) < 2:
+            continue
+        if canonical in BIOMEDICAL_ACRONYM_TERMS:
+            out.append(canonical)
+            continue
+        if canonical in BROAD_DOMAIN_ANCHORS or canonical in PROCESS_ANCHORS:
+            continue
+        if canonical in ANCHOR_ALIASES:
+            out.append(canonical)
+    return list(dict.fromkeys(out))
+
+
+def _anchor_aliases(anchor: str) -> set[str]:
+    canonical = _canonical_search_anchor(anchor)
+    values = {canonical}
+    values.update(ANCHOR_ALIASES.get(canonical, set()))
+    values.update(synonyms_for(canonical))
+    return {value for value in values if value}
+
+
+def _text_matches_anchor(text: str, anchor: str) -> bool:
+    lowered = (text or "").lower()
+    for alias in _anchor_aliases(anchor):
+        if not alias:
+            continue
+        pattern = r"(?<![a-z0-9])" + re.escape(alias.lower()).replace(r"\ ", r"[-\s]+") + r"(?![a-z0-9])"
+        if re.search(pattern, lowered):
+            return True
+    return False
+
+
+def _hit_anchor_coverage(item: dict[str, Any], search_frame: dict[str, Any]) -> dict[str, Any]:
+    anchors = _specific_required_anchors(search_frame.get("anchor_terms") or [])
+    if not anchors:
+        return {"required_anchors": [], "matched_anchors": [], "missing_anchors": [], "passes": True}
+    text = " ".join(
+        str(item.get(field) or "")
+        for field in ("title", "text", "sentence_text", "abstract", "subject", "relation", "predicate", "object")
+        if item.get(field)
+    )
+    annotations = item.get("annotations") or []
+    if isinstance(annotations, list):
+        text = f"{text} {' '.join(str(annotation) for annotation in annotations)}"
+    matched = [anchor for anchor in anchors if _text_matches_anchor(text, anchor)]
+    missing = [anchor for anchor in anchors if anchor not in set(matched)]
+    # Partial-match gate: for multi-anchor queries allow one missing anchor so that
+    # results covering one side of a relationship (e.g. the cancer side of a
+    # fungi+cancer query) are not silently dropped.
+    # N=1 ? still require the single anchor (unchanged).
+    # N>=2 ? require max(1, N-1) matched (allow at most 1 miss).
+    min_required = max(1, len(anchors) - 1) if len(anchors) >= 2 else len(anchors)
+    return {
+        "required_anchors": anchors,
+        "matched_anchors": matched,
+        "missing_anchors": missing,
+        "passes": len(matched) >= min_required,
+    }
+
+
+def _constraint_excluded_anchors(message: str) -> set[str]:
+    lowered = (message or "").lower()
+    excluded: set[str] = set()
+    if re.search(r"\bnot\s+(?:clinical\s+)?treatment\s+advice\b", lowered):
+        excluded.update({"clinical", "treatment", "advice"})
+    if re.search(r"\bnot\s+clinical\b", lowered):
+        excluded.add("clinical")
+    return excluded
+
+
 def _query_anchor_terms(message: str, limit: int = 12) -> list[str]:
     anchors: list[str] = []
+    excluded = _constraint_excluded_anchors(message)
     for term in important_terms(message, limit=limit * 2):
-        cleaned = str(term or "").strip().lower()
+        cleaned = _canonical_search_anchor(term)
         if (
             not cleaned
+            or cleaned in excluded
             or cleaned in GENERIC_REFINEMENT_TERMS
             or cleaned in AMBIGUITY_MARKERS
             or cleaned in PUZZLE_NODE_STOP_TERMS
+            or _is_task_or_style_term(term)
         ):
             continue
-        anchors.append(term)
+        anchors.append(cleaned)
         if len(anchors) >= limit:
             break
-    return list(dict.fromkeys(anchors))
+    return _expand_biomedical_anchors(list(dict.fromkeys(anchors)), limit=limit)
 
 
 def _task_bridge_terms(message: str) -> list[str]:
@@ -109,8 +353,18 @@ def _domain_search_frame(message: str, notes: list[dict[str, Any]] | None = None
 
     if anchors:
         preferred.append(" ".join(list(dict.fromkeys(anchors + task_terms))[:14]))
-    normalized = list(dict.fromkeys(normalize_idea(item) for item in extract_ideas(message, limit=8) if normalize_idea(item)))
-    normalized = [item for item in normalized if item not in GENERIC_REFINEMENT_TERMS and item not in NOISY_FEEDBACK_TERMS]
+    excluded_anchors = _constraint_excluded_anchors(message)
+    normalized = list(dict.fromkeys(_canonical_search_anchor(item) for item in extract_ideas(message, limit=8) if _canonical_search_anchor(item)))
+    normalized = [
+        item
+        for item in normalized
+        if item not in excluded_anchors
+        and item not in GENERIC_REFINEMENT_TERMS
+        and item not in NOISY_FEEDBACK_TERMS
+        and item not in PUZZLE_NODE_STOP_TERMS
+        and not _is_task_or_style_term(item)
+    ]
+    normalized = _expand_biomedical_anchors(normalized, limit=12)
     if normalized:
         preferred.append(" ".join(list(dict.fromkeys(normalized + task_terms))[:14]))
     if mechanistic_context and anchors:
@@ -318,31 +572,45 @@ def deterministic_query_variants(
     max_variants: int = 4,
     search_frame: dict[str, Any] | None = None,
 ) -> list[SearchQueryVariant]:
-    terms = important_terms(message, limit=18)
-    ideas = extract_ideas(message, limit=10)
+    terms = _query_anchor_terms(message, limit=18)
+    ideas = [
+        _canonical_search_anchor(item)
+        for item in extract_ideas(message, limit=10)
+        if _canonical_search_anchor(item)
+        and _canonical_search_anchor(item) not in _constraint_excluded_anchors(message)
+        and not _is_task_or_style_term(item)
+    ]
     normalized = list(dict.fromkeys(normalize_idea(item) for item in ideas if normalize_idea(item)))
+    normalized = [
+        item
+        for item in normalized
+        if item not in GENERIC_REFINEMENT_TERMS
+        and item not in AMBIGUITY_MARKERS
+        and item not in PUZZLE_NODE_STOP_TERMS
+        and item not in SEARCH_TASK_TERMS
+    ]
     synonym_terms: list[str] = []
     for idea in normalized[:6]:
         synonym_terms.extend(synonyms_for(idea)[:3])
     synonym_terms = list(dict.fromkeys(synonym_terms))
 
-    candidates: list[tuple[str, str, str, str]] = [
-        ("original", message, "narrow" if strategy == "narrow" else strategy, "deterministic"),
-    ]
+    raw_terms = important_terms(message, limit=24)
+    task_heavy_query = bool(raw_terms and terms and (len(terms) / max(1, len(raw_terms))) < 0.5)
+    candidates: list[tuple[str, str, str, str]] = []
+    if not task_heavy_query or not terms:
+        candidates.append(("original", message, "narrow" if strategy == "narrow" else strategy, "deterministic"))
     if terms:
         candidates.append(("important_terms", " ".join(terms[:10]), strategy, "deterministic"))
+    preferred_queries = list((search_frame or {}).get("preferred_queries", [])[:3])
+    for preferred in preferred_queries:
+        candidates.append(("domain_bridge", preferred, "wide" if strategy != "narrow" else "medium", "deterministic"))
     if synonym_terms:
         candidates.append(("biomedical_synonyms", " ".join(list(dict.fromkeys(normalized + synonym_terms))[:12]), "wide", "deterministic"))
-    preferred_queries = list((search_frame or {}).get("preferred_queries", [])[:3])
-    if preferred_queries:
-        candidates.append(("domain_bridge", preferred_queries[0], "wide" if strategy != "narrow" else "medium", "deterministic"))
     if terms and (_intent_bucket(message) in {"mechanism", "compare", "evidence"} or _query_ambiguity(message, 0) != "low"):
         relation_words = ["mechanism", "evidence", "relationship"] if _intent_bucket(message) == "mechanism" else ["evidence", "relationship"]
         candidates.append(("relation_probe", " ".join(list(dict.fromkeys(terms[:10] + relation_words))), "wide", "deterministic"))
     if normalized:
         candidates.append(("normalized_ideas", " ".join(normalized[:8]), "medium", "deterministic"))
-    for preferred in preferred_queries[1:]:
-        candidates.append(("domain_bridge", preferred, "wide" if strategy != "narrow" else "medium", "deterministic"))
     if strategy == "wide" and terms and normalized:
         candidates.append(("mixed_wide", " ".join(list(dict.fromkeys(normalized + terms[:10] + synonym_terms[:6]))), "wide", "deterministic"))
 
@@ -350,12 +618,17 @@ def deterministic_query_variants(
 
 
 FOLLOWUP_CONTEXT_MARKERS = {
-    "as above", "candidate framework", "candidate frameworks", "continue", "develop",
+    "as above", "candidate framework", "candidate frameworks", "continue",
     "earlier", "latest candidate", "previous", "start by", "suggested", "those",
     "use what is actually supported", "what is actually supported",
+    "search more", "search again", "look further", "look more", "all available data",
+    "all available sources", "available data sources", "use all your available",
     "answer again", "give me a one-paragraph version", "keep biomedical direction",
     "keep direction correct", "novice user", "one paragraph version",
     "one-paragraph version", "summarize that", "rewrite that",
+    "concise answer", "essential caveat", "caveat must not disappear",
+    "must not disappear", "what essential caveat", "keep the caveat",
+    "do not omit the caveat", "don't omit the caveat",
     "can the chatbot phrase", "can i phrase", "could i phrase", "phrase the answer",
     "phrasing", "the statement", "this statement", "that statement",
 }
@@ -363,6 +636,71 @@ FOLLOWUP_CONTEXT_MARKERS = {
 
 def _is_followup_reference(message: str) -> bool:
     return _contains_any(message, FOLLOWUP_CONTEXT_MARKERS)
+
+
+_CLARIF_REPLY_RE = re.compile(
+    r"^[a-z](?:\s*(?:,\s*|and\s+)[a-z])*\.?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _is_clarification_reply(message: str) -> bool:
+    """True when message is only option letters: 'a', 'b and c', 'a, b, c'."""
+    stripped = message.strip()
+    return len(stripped) <= 20 and bool(_CLARIF_REPLY_RE.match(stripped))
+
+
+# Discourse/conversational replies that are never biomedical anchors.
+# _query_anchor_terms returns ['yes'] for 'yes' and ['second'] for 'the second one',
+# bypassing the short-message guard. This set short-circuits that path.
+_CONTEXT_POOR_EXACT: frozenset[str] = frozenset({
+    "yes", "no", "yeah", "nope", "yep", "sure", "ok", "okay", "alright",
+    "i see", "got it", "understood", "noted", "right", "correct",
+    "agreed", "exactly", "perfect", "great",
+    # Ordinal / positional replies
+    "the first one", "the second one", "the third one", "the fourth one",
+    "the last one", "the first", "the second", "the third", "the fourth",
+    "first one", "second one", "third one", "last one",
+    "that one", "this one", "the other one", "that option", "that approach",
+    # Collective replies
+    "all of them", "all of those", "both of them", "all three",
+    "none of them", "neither",
+    # Intent-reference replies — 'meant' passes as anchor but is never biomedical
+    "i meant that", "i meant this", "what i meant", "that is what i meant",
+    "i mean that", "i meant the other", "i meant the first", "i meant the second",
+    "that is what i asked", "that is what i was asking",
+    "yes that", "yes this", "yes both", "yes all", "yes exactly",
+    "i want both", "i want all", "i want the first", "i want the second",
+})
+
+
+def _is_context_poor(message: str) -> bool:
+    """True when message is too short or vague to carry its own retrieval signal.
+    Covers letter replies, 'the second one', 'yes', 'I meant that', etc.
+    The model already sees conversation history and can reason correctly;
+    the problem is only the BM25 search getting nonsense queries.
+    """
+    stripped = message.strip().lower().rstrip(" .,!?")
+    if stripped in _CONTEXT_POOR_EXACT:
+        return True
+    # limit=2 → important_terms gets 4 candidates; needed so that medical proper
+    # nouns ranked 3rd (e.g. 'Aspergillus' after 'how', 'does') still register.
+    return _is_clarification_reply(message) or (
+        not _query_anchor_terms(message, limit=2)
+        and len(message.split()) <= 8
+    )
+
+
+def _prior_frame_compatible(message: str, prior_query: str) -> bool:
+    if _is_followup_reference(message):
+        return True
+    current = set(_query_anchor_terms(message, limit=12))
+    prior = set(_query_anchor_terms(prior_query, limit=12))
+    if not current or not prior:
+        return False
+    current_specific = set(_specific_required_anchors(current)) or current
+    prior_specific = set(_specific_required_anchors(prior)) or prior
+    return bool(current_specific & prior_specific)
 
 
 def _is_rewrite_or_diagnostic_followup(message: str) -> bool:
@@ -374,6 +712,9 @@ def _is_rewrite_or_diagnostic_followup(message: str) -> bool:
             "novice user",
             "one paragraph version",
             "one-paragraph version",
+            "concise answer",
+            "essential caveat",
+            "must not disappear",
             "summarize that",
             "rewrite that",
             "reward model",
@@ -416,6 +757,33 @@ def _prior_frame_variants(notes: list[dict[str, Any]], limit: int = 2) -> list[S
         if len(candidates) >= limit:
             break
     return _dedupe_queries(candidates, limit)
+
+
+def _note_from_conversation_frame(frame: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not frame:
+        return None
+    terms = [
+        str(term)
+        for term in (frame.get("active_terms") or [])
+        if isinstance(term, str) and term.strip()
+    ]
+    anchors = _query_anchor_terms(" ".join(terms), limit=10)
+    if not anchors:
+        return None
+    query = " ".join(anchors[:10])
+    return {
+        "note": "Recovered prior search frame from conversation memory.",
+        "search_plan": {
+            "variants": [
+                {
+                    "label": "prior_frame",
+                    "query": query,
+                    "strategy": "medium",
+                    "source": "conversation_frame",
+                }
+            ]
+        },
+    }
 
 
 def deterministic_search_levels(message: str, *, strategy: str = "medium") -> list[str]:
@@ -488,6 +856,8 @@ async def llm_refine_variants(
     action_value_hints: list[dict[str, Any]],
     search_frame: dict[str, Any],
     max_variants: int,
+    intent: str = "new_query",
+    prior_frame_summary: str | None = None,
     llm_provider: str | None = None,
     llm_model: str | None = None,
     llm_api_format: str | None = None,
@@ -504,13 +874,7 @@ async def llm_refine_variants(
     messages = [
         {
             "role": "system",
-            "content": (
-                "You are a biomedical multilevel search planner for OpenSearch BM25. "
-                "The retrieval levels are title, paper, and sentence. Title search finds candidate papers and vocabulary; "
-                "paper/chunk search gathers broader article context; sentence/triplet search finds exact evidence sentences. "
-                "Later searches will be expanded with compact terms from earlier levels. Return JSON only. "
-                "Do not include hidden reasoning. Improve search breadth and terminology."
-            ),
+            "content": frame_system_prompt(intent, prior_frame_summary),
         },
         {
             "role": "user",
@@ -528,10 +892,11 @@ async def llm_refine_variants(
     ]
     text = await LLMClient().chat_once(
         messages,
-        provider=llm_provider or settings.llm.context_manager_provider,
+        provider=llm_provider,
         model=llm_model,
         api_format=llm_api_format,
         max_tokens=900,
+        agent="frame",
     )
     data = _extract_json_object(text) or {}
     raw_queries = data.get("queries") or []
@@ -550,6 +915,86 @@ async def llm_refine_variants(
     return _dedupe_queries(candidates, max_variants), _compact_text(note, 500)
 
 
+async def resolve_message_intent(
+    message: str,
+    *,
+    notes: list[dict[str, Any]],
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_api_format: str | None = None,
+) -> dict[str, str] | None:
+    """Context-manager agent resolves the actual search intent of a context-poor message.
+
+    The context_manager (nemotron-3-super-120b, reasoning=medium) inspects the
+    message + conversation frame and returns one of three intents:
+      prior_context  -- the message references prior options/context; reuse prior frame
+      new_query      -- the message has its own intent; effective_query has the full text
+      augment_prior  -- blend prior context with new information in effective_query
+    Returns None when no prior context exists or the LLM call fails (caller uses heuristic).
+    """
+    active_terms: list[str] = []
+    summary = ""
+    recent_queries: list[str] = []
+    recent_turns: list[str] = []
+    for _n in (notes or [])[:8]:
+        if not active_terms and _n.get("active_terms"):
+            active_terms = list(_n["active_terms"])[:8]
+        if not summary and _n.get("summary"):
+            summary = str(_n["summary"])[:300]
+        if _n.get("query"):
+            recent_queries.append(str(_n["query"]))
+        if not recent_turns and _n.get("recent_turns"):
+            recent_turns = list(_n["recent_turns"])[:6]
+    if not active_terms and not recent_queries and not recent_turns:
+        return None
+    _has_wbuf = bool(recent_turns)
+    _has_frame = bool(active_terms or summary)
+    _messages = [
+        {
+            "role": "system",
+            "content": intent_resolution_system_prompt(_has_wbuf, _has_frame, active_terms),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"User message: {message!r}\n\n"
+                f"Prior conversation summary: {summary or 'none'}\n"
+                f"Active research terms: {active_terms}\n"
+                f"Prior search queries (recent first): {recent_queries[:4]}\n"
+                + (
+                    "Recent conversation turns (working buffer):\n"
+                    + "\n".join(recent_turns) + "\n"
+                    if recent_turns else ""
+                )
+                + "\n"
+                + 'Respond with JSON: {"intent": "prior_context|new_query|augment_prior", '
+                '"effective_query": "<full biomedical query capturing actual intent>", '
+                '"explanation": "<one sentence>"}'
+            ),
+        },
+    ]
+    try:
+        _text = await LLMClient().chat_once(
+            _messages,
+            provider=llm_provider,
+            model=llm_model,
+            api_format=llm_api_format,
+            max_tokens=250,
+            agent="context_manager",
+        )
+        _data = _extract_json_object(_text)
+        if not _data or "intent" not in _data:
+            return None
+        return {
+            "intent": str(_data.get("intent", "prior_context")),
+            "effective_query": str(_data.get("effective_query", "")),
+            "explanation": str(_data.get("explanation", "")),
+        }
+    except Exception as _e:
+        print(f"[WARN] resolve_message_intent failed: {_e}")
+        return None
+
+
 async def plan_auto_context(
     *,
     message: str,
@@ -565,30 +1010,83 @@ async def plan_auto_context(
     state = search_state_key(message, selected_context_count=selected_context_count)
     strategy = _strategy_from_hints(action_value_hints, notes)
     search_frame = _domain_search_frame(message, notes)
-    base = deterministic_query_variants(message, strategy=strategy, max_variants=max_variants, search_frame=search_frame)
+
+    # ── Context-manager intent resolution ──────────────────────────────────
+    # _is_context_poor() is a cheap gate: when the message is short/vague with
+    # no biomedical anchors, the context_manager agent (120b, reasoning=medium)
+    # decides what the actual search intent is, rather than a hardcoded rule.
+    # The agent can return prior_context (use prior frame), new_query (different
+    # intent), or augment_prior (blend). Falls back to heuristic on failure.
+    _context_poor = _is_context_poor(message)
+    _resolved: dict[str, str] | None = None
+    _eff_msg = message
+    if _context_poor and allow_llm_refine:
+        _resolved = await resolve_message_intent(
+            message,
+            notes=notes,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            llm_api_format=llm_api_format,
+        )
+        if _resolved and _resolved.get("intent") in {"new_query", "augment_prior"} and _resolved.get("effective_query"):
+            _eff_msg = _resolved["effective_query"]
+
+    base = deterministic_query_variants(_eff_msg, strategy=strategy, max_variants=max_variants, search_frame=search_frame)
     prior: list[SearchQueryVariant] = []
-    if _is_followup_reference(message):
-        prior = _prior_frame_variants(notes)
-        if prior:
-            merged = [*prior, *base]
+    _skip_frame_refine = False
+
+    if _resolved and _resolved.get("intent") == "prior_context":
+        all_prior = list(_prior_frame_variants(notes))
+        if all_prior:
+            prior = all_prior
             base = _dedupe_queries(
-                [(item.label, item.query, item.strategy, item.source) for item in merged],
+                [(item.label, item.query, item.strategy, item.source) for item in prior],
                 max_variants,
             )
-    levels = deterministic_search_levels(message, strategy=strategy)
-    used_llm = False
-    planner_note = ""
+        _skip_frame_refine = True
+    elif _is_followup_reference(_eff_msg) or (_context_poor and not _resolved):
+        # Heuristic fallback: LLM not invoked or call failed
+        all_prior = list(_prior_frame_variants(notes))
+        if _context_poor and not _resolved and all_prior:
+            prior = all_prior
+            base = _dedupe_queries(
+                [(item.label, item.query, item.strategy, item.source) for item in prior],
+                max_variants,
+            )
+            _skip_frame_refine = True
+        else:
+            prior = [
+                item
+                for item in all_prior
+                if _prior_frame_compatible(_eff_msg, item.query)
+            ]
+            if prior:
+                merged = [*prior, *base]
+                base = _dedupe_queries(
+                    [(item.label, item.query, item.strategy, item.source) for item in merged],
+                    max_variants,
+                )
+
+    levels = deterministic_search_levels(_eff_msg, strategy=strategy)
+    used_llm = bool(_resolved)
+    planner_note = (_resolved or {}).get("explanation", "")
     variants = list(base)
 
-    if allow_llm_refine and base:
+    if allow_llm_refine and base and not _skip_frame_refine:
         try:
+            _frame_intent = (_resolved or {}).get("intent", "new_query")
+            _frame_prior = prior[0].query if prior else (
+                _eff_msg[:200] if _frame_intent == "augment_prior" else None
+            )
             llm_variants, planner_note = await llm_refine_variants(
-                message,
+                _eff_msg,
                 base_variants=base,
                 notes=notes,
                 action_value_hints=action_value_hints,
                 search_frame=search_frame,
                 max_variants=max_variants,
+                intent=_frame_intent,
+                prior_frame_summary=_frame_prior,
                 llm_provider=llm_provider,
                 llm_model=llm_model,
                 llm_api_format=llm_api_format,
@@ -706,6 +1204,14 @@ def _retrieval_tags(item: dict[str, Any]) -> dict[str, list[str]]:
     }
 
 
+_FEEDBACK_POS_STOP = {
+    "meanwhile", "correlated", "correlates", "correlating", "suggesting",
+    "indicated", "notably", "consistently", "respectively", "particularly",
+    "consequently", "additionally", "furthermore", "moreover", "although",
+    "whereas", "demonstrated", "associated", "mediated", "observed",
+}
+
+
 def _feedback_candidates(texts: list[str], limit: int) -> list[str]:
     ideas = extract_ideas(*texts, limit=limit)
     terms = important_terms(" ".join(texts), limit=limit * 2)
@@ -713,7 +1219,7 @@ def _feedback_candidates(texts: list[str], limit: int) -> list[str]:
     out: list[tuple[float, str]] = []
     for term in list(dict.fromkeys(ideas + terms)):
         cleaned = term.lower().strip()
-        if cleaned in NOISY_FEEDBACK_TERMS:
+        if cleaned in NOISY_FEEDBACK_TERMS or cleaned in PUZZLE_NODE_STOP_TERMS or cleaned in _FEEDBACK_POS_STOP:
             continue
         if re.fullmatch(r"[a-z]{7,}", cleaned) and not set(important_terms(cleaned, 4)) & set(important_terms(" ".join(texts), 96)):
             continue
@@ -764,12 +1270,15 @@ def _feedback_term_report(
     limit: int = 8,
 ) -> dict[str, Any]:
     anchor_terms = {
-        term
+        _canonical_search_anchor(term)
         for term in important_terms(" ".join(anchor_queries or []), 96)
-        if term not in GENERIC_REFINEMENT_TERMS
-        and term not in AMBIGUITY_MARKERS
-        and term not in PUZZLE_NODE_STOP_TERMS
+        if _canonical_search_anchor(term)
+        and _canonical_search_anchor(term) not in GENERIC_REFINEMENT_TERMS
+        and _canonical_search_anchor(term) not in AMBIGUITY_MARKERS
+        and _canonical_search_anchor(term) not in PUZZLE_NODE_STOP_TERMS
+        and not _is_task_or_style_term(term)
     }
+    has_specific_anchor = _has_specific_search_anchor(anchor_terms)
     accepted_texts: list[str] = []
     rejected_texts: list[str] = []
     rejected_result_count = 0
@@ -791,6 +1300,12 @@ def _feedback_term_report(
         accepted_texts.append(text)
 
     accepted_terms = _feedback_candidates(accepted_texts, limit)
+    if anchor_terms and not has_specific_anchor:
+        accepted_terms = [
+            term
+            for term in accepted_terms
+            if _canonical_search_anchor(term) in anchor_terms
+        ]
     rejected_terms = [
         term
         for term in _feedback_candidates(rejected_texts, limit)
@@ -853,11 +1368,33 @@ AMBIGUITY_MARKERS = {
     "connect", "link", "somehow", "environment", "develop",
 }
 PUZZLE_NODE_STOP_TERMS = {
+    # Original set
     "develop", "relating", "related", "relationship", "something", "else", "promotes",
     "promote", "environment", "question", "evidence", "mechanism", "pathway", "body",
     "latest", "start", "explain", "explaining", "conceptual", "then", "candidate",
     "framework", "frameworks", "suggested", "described", "playing", "role",
-    "roles", "essential", "how", "happen", "happens",
+    "roles", "essential", "how", "happen", "happens", "all", "available",
+    "data", "source", "sources", "search", "more", "supplementary", "material",
+    # Quantifiers / modal adjectives that appear in user queries but are not entities
+    "possible", "likely", "various", "certain", "multiple", "specific", "known",
+    "given", "new", "old", "big", "small", "high", "low", "more", "less",
+    "any", "some", "each", "both", "other", "such", "one", "two", "three",
+    # Common verbs / gerunds
+    "involving", "involve", "involves", "include", "including", "using", "use", "used",
+    "based", "show", "shows", "shown", "found", "suggest", "suggests", "affect",
+    "does", "play", "make", "have", "been", "are", "was", "will", "can", "may",
+    "shall",
+    # Prepositions / logical connectors
+    "between", "through", "without", "within", "during", "before", "after",
+    "under", "over", "around", "another", "among", "across", "about", "toward",
+    "because", "therefore", "however", "although", "that", "with", "from", "this",
+    "what", "why", "when", "where", "which", "who", "the", "and", "for",
+    "its", "not", "but", "also",
+    # Generic nouns that aren't biomedical entities
+    "life", "style", "type", "form", "part", "way", "time", "case", "level",
+    "effect", "function", "process", "activity", "response", "outcome",
+    "interested", "general to particular", "general-to-particular", "particular",
+    "ph",  # pH handled separately via regex; raw "ph" is not a searchable anchor
 }
 
 
@@ -902,7 +1439,8 @@ def _evidence_assembly(
     rejected_count = sum(len(report.get("rejected_feedback_terms") or []) for report in level_reports)
     rejected_results = sum(int(report.get("rejected_feedback_result_count", 0) or 0) for report in level_reports)
     ungrounded_count = sum(int(report.get("ungrounded_feedback_term_count", 0) or 0) for report in level_reports)
-    drift_penalty = ungrounded_count / max(1, accepted_count + ungrounded_count)
+    anchor_rejected_count = sum(int(report.get("anchor_mismatch_result_count", 0) or 0) for report in level_reports)
+    drift_penalty = (ungrounded_count + anchor_rejected_count) / max(1, accepted_count + ungrounded_count + anchor_rejected_count)
     breadth = min(1.0, len(distinct_papers) / max(1, min(3, len(plan.levels))))
     assembly_quality = round(max(0.0, min(1.0, (0.65 * level_coverage) + (0.25 * breadth) + (0.10 * (1.0 - drift_penalty)))), 4)
     ambiguity = _query_ambiguity(analysis_message, len(snippets))
@@ -915,11 +1453,17 @@ def _evidence_assembly(
     node_keys: set[str] = set()
     for node in raw_query_nodes:
         cleaned = str(node).strip()
-        key = normalize_idea(cleaned) or cleaned.lower().rstrip("s")
-        if not cleaned or cleaned.lower() in PUZZLE_NODE_STOP_TERMS or key in node_keys:
+        key = _canonical_search_anchor(cleaned) or cleaned.lower().rstrip("s")
+        is_explicit_ph = key == "ph" and bool(re.search(r"\bp\s*h\b|\bph\b", cleaned, flags=re.IGNORECASE))
+        if (
+            not cleaned
+            or ((cleaned.lower() in PUZZLE_NODE_STOP_TERMS or key in PUZZLE_NODE_STOP_TERMS) and not is_explicit_ph)
+            or _is_task_or_style_term(cleaned)
+            or key in node_keys
+        ):
             continue
         node_keys.add(key)
-        query_nodes.append(cleaned)
+        query_nodes.append(key)
         if len(query_nodes) >= 10:
             break
 
@@ -930,6 +1474,13 @@ def _evidence_assembly(
 
     covered_nodes = [node for node in query_nodes if node_matches_text(node, evidence_text, evidence_terms)]
     missing_nodes = [node for node in query_nodes if node not in set(covered_nodes)]
+    task_terms = set(plan.search_frame.get("task_terms") or [])
+    mechanistic_task_terms = {
+        "mechanism", "mechanistic", "pathogenesis", "signaling", "inflammation",
+        "immune", "metabolism", "pathway", "pathways", "via", "through",
+    }
+    requires_mechanistic_evidence = _intent_bucket(message) == "mechanism" or bool(task_terms & mechanistic_task_terms)
+    mechanistic_terms_present = bool(evidence_terms & mechanistic_task_terms)
     relation_markers = {
         "activates", "affects", "associated", "association", "causes", "contributes",
         "drives", "increases", "inhibits", "links", "promotes", "reduces",
@@ -949,12 +1500,27 @@ def _evidence_assembly(
         edge_status = "partial"
     else:
         edge_status = "missing"
+    if requires_mechanistic_evidence and not mechanistic_terms_present and edge_status == "supported":
+        edge_status = "partial"
+    node_coverage = len(covered_nodes) / max(1, len(query_nodes))
+    if query_nodes and node_coverage < 0.35:
+        assembly_quality = round(min(assembly_quality, 0.45 + (0.25 * node_coverage)), 4)
+    if edge_status == "missing":
+        assembly_quality = round(min(assembly_quality, 0.55), 4)
+    elif edge_status == "partial":
+        assembly_quality = round(min(assembly_quality, 0.78), 4)
+    underspecified_umbrella_frame = (
+        bool(query_nodes)
+        and not _has_specific_search_anchor(query_nodes)
+        and edge_status == "missing"
+    )
     suppress_clarification_hold = _is_rewrite_or_diagnostic_followup(message) or _is_phrase_evaluation(message)
     clarification_needed = (
         not suppress_clarification_hold
         and (
-            ambiguity == "high"
-            or (ambiguity == "medium" and edge_status == "missing")
+            underspecified_umbrella_frame
+            or ambiguity == "high"
+            or (ambiguity == "medium" and edge_status == "missing" and bool(missing_nodes))
             or (bool(prior_frame_queries) and _is_followup_reference(message) and edge_status != "supported")
         )
     )
@@ -973,7 +1539,9 @@ def _evidence_assembly(
         clarification_line = (
             "- The opening paragraph must end with one focused textual clarification before any list or pathway steps. "
             f"Ask which evidence frame should lead ({', '.join(frame_labels)}). Do not use a UI choice widget. "
-            "Ask only this opening clarification; do not repeat it later as A/B/C or numbered frame choices.\n"
+            "Ask only this opening clarification; do not repeat it later as A/B/C or numbered frame choices. "
+            "If the retrieved evidence only covers an umbrella domain term, do not choose an incidental named mechanism from the snippets; "
+            "ask for the concrete mechanism, disease context, entity, or evidence frame to prioritize.\n"
         )
     phrase_eval_line = ""
     if _is_phrase_evaluation(message):
@@ -1017,6 +1585,7 @@ def _evidence_assembly(
             "rejected_feedback_term_count": rejected_count,
             "rejected_feedback_result_count": rejected_results,
             "ungrounded_feedback_term_count": ungrounded_count,
+            "anchor_mismatch_result_count": anchor_rejected_count,
         },
         "prompt_context": prompt_context,
         "evidence_puzzle": {
@@ -1027,6 +1596,149 @@ def _evidence_assembly(
             "edge_support_status": edge_status,
         },
     }
+
+
+
+
+def _snippet_utility(
+    snippet: dict,
+    query_anchors: set,
+    gap_spec: "GapSpec | None" = None,
+) -> float:
+    """Score a retrieved snippet for context-slot utility (WP-C, SEAL-RAG).
+
+    Components:
+      0.35 * bm25_norm    ? normalised retrieval score (engines return ~0-10)
+      0.35 * anchor_ratio ? fraction of query anchors covered by snippet text
+      0.30 * gap_closing  ? fraction of missing_entities mentioned in snippet
+    """
+    score_raw = float(snippet.get("retrieval_score") or snippet.get("score") or 0.5)
+    bm25_norm = min(score_raw / 10.0, 1.0)
+
+    text_lower = (snippet.get("text") or snippet.get("snippet") or "").lower()
+    if query_anchors:
+        anchor_ratio = sum(1 for a in query_anchors if a in text_lower) / len(query_anchors)
+    else:
+        anchor_ratio = 0.0
+
+    missing = getattr(gap_spec, "missing_entities", set()) if gap_spec is not None else set()
+    if missing:
+        gap_closing = sum(1 for e in missing if e.lower() in text_lower) / len(missing)
+    else:
+        gap_closing = 0.0
+
+    return 0.35 * bm25_norm + 0.35 * anchor_ratio + 0.30 * gap_closing
+
+
+
+async def llm_ground_entities(
+    message: str,
+    *,
+    snippets: list[dict],
+    gap_spec,
+    llm_provider=None,
+    llm_model=None,
+    llm_api_format=None,
+) -> None:
+    """NER-bootstrap: classify query entities against retrieved context via LLM.
+
+    status values
+    -------------
+    confirmed : entity appears verbatim in the retrieved context.
+    synonym   : semantically equivalent term present under a different surface form
+                (e.g. query "lung cancer", context has "NSCLC").
+    absent    : entity not represented in any retrieved source.
+
+    Works with both GapSpec dataclass (build_auto_context) and dict (policy.plan).
+    Enriches confirmed_entities with synonym-grounded forms and populates
+    entity_map for downstream gap-steering and feedback-term filtering.
+    """
+    query_ents = list(dict.fromkeys(
+        _query_anchor_terms(message, limit=14)
+        + [_canonical_search_anchor(e) for e in extract_ideas(message, limit=8)
+           if _canonical_search_anchor(e)
+           and _canonical_search_anchor(e) not in PUZZLE_NODE_STOP_TERMS]
+    ))[:16]
+    if not query_ents or not snippets:
+        return
+
+    ctx_pool = []
+    for item in snippets[:20]:
+        for _etype, _eids in (item.get("pubtator_entities") or {}).items():
+            ctx_pool.extend(f"{_etype}:{eid}" for eid in (_eids or []))
+        text = " ".join(
+            str(item.get(f) or "")
+            for f in ("title", "sentence_text", "text", "snippet", "subject", "object")
+            if item.get(f)
+        )
+        ctx_pool.extend(important_terms(text, 12))
+    ctx_entities = list(dict.fromkeys(ctx_pool))[:40]
+    if not ctx_entities:
+        return
+
+    _conf = getattr(gap_spec, "confirmed_entities", None)
+    if _conf is None and isinstance(gap_spec, dict):
+        _conf = gap_spec.get("confirmed_entities") or []
+    _ner_confirmed_count = len(_conf or [])
+    _ner_is_discovery = _ner_confirmed_count == 0
+    messages = [
+        {
+            "role": "system",
+            "content": ner_grounding_system_prompt(_ner_is_discovery, _ner_confirmed_count),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"User query: {message[:400]}\n"
+                f"Query entities to classify: {query_ents}\n"
+                f"Context entity pool (all retrieved sources): {ctx_entities[:30]}\n\n"
+                'Return: {"grounded": [{"entity": str, "status": "confirmed|synonym|absent",'
+                ' "context_match": str_or_null}]}'
+            ),
+        },
+    ]
+    try:
+        raw = await LLMClient().chat_once(
+            messages,
+            provider=llm_provider,
+            model=llm_model,
+            api_format=llm_api_format,
+            max_tokens=500,
+            agent="ner_grounding",
+        )
+        data = _extract_json_object(raw) or {}
+        _confirmed: set[str] = set()
+        _absent: set[str] = set()
+        _emap: dict = {}
+        for rec in data.get("grounded") or []:
+            ent = str(rec.get("entity") or "").strip().lower()
+            status = str(rec.get("status") or "").lower()
+            match_ = str(rec.get("context_match") or "").strip() or None
+            if not ent or status not in {"confirmed", "synonym", "absent"}:
+                continue
+            _emap[ent] = {"status": status, "context_match": match_}
+            (_confirmed if status in {"confirmed", "synonym"} else _absent).add(ent)
+
+        if isinstance(gap_spec, GapSpec):
+            gap_spec.query_entities.update(query_ents)
+            gap_spec.entity_map.update(_emap)
+            gap_spec.confirmed_entities.update(_confirmed)
+            gap_spec.missing_entities.update(_absent - gap_spec.confirmed_entities)
+            gap_spec.missing_entities -= gap_spec.confirmed_entities
+            gap_spec.update_coverage()
+        else:
+            _prev = set(gap_spec.get("confirmed_entities") or [])
+            _prev.update(_confirmed)
+            gap_spec["confirmed_entities"] = sorted(_prev)
+            _miss = set(gap_spec.get("missing_entities") or []) | _absent
+            _miss -= _prev
+            gap_spec["missing_entities"] = sorted(_miss)
+            gap_spec["query_entities"] = sorted(
+                set(gap_spec.get("query_entities") or []) | set(query_ents)
+            )
+            gap_spec.setdefault("entity_map", {}).update(_emap)
+    except Exception:
+        pass  # non-fatal: gap_spec retains its anchor-based state
 
 
 async def build_auto_context(
@@ -1042,10 +1754,45 @@ async def build_auto_context(
     llm_provider: str | None = None,
     llm_model: str | None = None,
     llm_api_format: str | None = None,
+    # Modules 3/4: optional run identifier for eval-level vocab tracking
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     max_variants = max(1, int(settings.memory.auto_context_query_variants))
     k_total = max(1, int(settings.memory.auto_context_k))
     notes = await store.search_policy_notes(session_id=session_id, limit=4)
+    # Inject conversation_frame into notes both for followup references AND
+    # context-poor messages (short/vague, no biomedical anchors) so that
+    # resolve_message_intent() has the current topic's active_terms to reason from.
+    if _is_followup_reference(message) or _is_context_poor(message):
+        try:
+            frame_note = _note_from_conversation_frame(await store.conversation_frame(session_id))
+        except Exception:
+            frame_note = None
+        if frame_note:
+            notes = [frame_note, *notes]
+
+    # Pass recent turns to resolve_message_intent() so context_manager sees
+    # the actual model output (e.g. 'a) ... b) ...') before the vague reply.
+    if _is_context_poor(message):
+        try:
+            _recent = await store.recent_messages(session_id, 3, token_budget=4000)
+            if _recent:
+                _turns_text = [
+                    f"[Turn {r.get('turn_index', i + 1)}] "
+                    f"{r.get('role', '?')}: "
+                    f"{str(r.get('content', ''))[:300]}"
+                    for i, r in enumerate(_recent[-6:])
+                ]
+                notes = [
+                    *notes,
+                    {
+                        "note": "Recent conversation turns (working buffer)",
+                        "recent_turns": _turns_text,
+                    },
+                ]
+        except Exception:
+            pass
+
     state = search_state_key(message, selected_context_count=selected_context_count)
     action_value_hints = await store.action_values(session_id=session_id, state_key=state, limit=4)
     plan = await plan_auto_context(
@@ -1065,7 +1812,25 @@ async def build_auto_context(
     level_reports: list[dict[str, Any]] = []
     feedback_terms: list[str] = []
     skipped_off_topic = 0
+    # WP-B: GapSpec accumulation across levels
+    gap_spec = GapSpec()
+    gap_spec_before = GapSpec()
+    previous_query_terms: list[set] = []
+    step_rewards_collected: list[dict] = []
+    _query_anchors_set = set(_query_anchor_terms(message))
     level_budgets = _level_budgets(plan.levels, k_total)
+
+    # Module 2 Point A: inject high-utility session vocabulary terms into anchor_terms
+    if VocabularyStore.enabled() and session_id:
+        _vs_inject = VocabularyStore()
+        _session_terms = _vs_inject.session_top_terms(session_id, limit=20)
+        _existing_anchors = set(plan.search_frame.get("anchor_terms") or [])
+        _new_anchors = [
+            t for t, _ in _session_terms if t not in _existing_anchors
+        ][:max(0, 16 - len(_existing_anchors))]
+        if _new_anchors:
+            plan.search_frame["anchor_terms"] = list(_existing_anchors) + _new_anchors
+            plan.search_frame["session_vocab_injected"] = _new_anchors
 
     if multilevel_search_fn is None and search_fn is not None:
         async def compat_level_search(tenant_arg: str, level: str, query: str, filters: dict[str, Any], k: int) -> list[dict[str, Any]]:
@@ -1075,6 +1840,7 @@ async def build_auto_context(
         multilevel_search_fn = hybrid_search_multilevel
 
     for level_index, level in enumerate(plan.levels):
+        gap_spec_before = copy.copy(gap_spec)  # snapshot for per-step reward
         if len(snippets) >= k_total:
             break
         level_budget = max(1, min(level_budgets.get(level, 1), k_total - len(snippets)))
@@ -1101,6 +1867,19 @@ async def build_auto_context(
                 continue
             for rank, hit in enumerate(hits or [], start=1):
                 item = dict(hit)
+                anchor_coverage = _hit_anchor_coverage(item, plan.search_frame)
+                item["anchor_coverage"] = anchor_coverage
+                if not anchor_coverage["passes"]:
+                    skipped_off_topic += 1
+                    level_added.append(
+                        {
+                            "_rejected_anchor_mismatch": True,
+                            "anchor_coverage": anchor_coverage,
+                            "title": item.get("title"),
+                            "text": item.get("text") or item.get("sentence_text"),
+                        }
+                    )
+                    continue
                 if _is_off_topic_hit(item, plan.search_frame):
                     skipped_off_topic += 1
                     continue
@@ -1127,6 +1906,18 @@ async def build_auto_context(
                 item["source_sentence_id"] = item.get("sent_id") or item.get("sentence_id")
                 item.update(_retrieval_tags(item))
                 item["feedback_terms_used"] = feedback_terms[:8]
+                # WP-B: accumulate GapSpec from this accepted hit
+                for _anc in anchor_coverage.get("matched_anchors") or []:
+                    gap_spec.confirmed_entities.add(_anc.lower())
+                    gap_spec.missing_entities.discard(_anc.lower())
+                for _anc in anchor_coverage.get("missing_anchors") or []:
+                    if _anc.lower() not in gap_spec.confirmed_entities:
+                        gap_spec.missing_entities.add(_anc.lower())
+                # absorb PubTator entities if present
+                for _etype, _eids in (item.get("pubtator_entities") or {}).items():
+                    for _eid in _eids:
+                        gap_spec.confirmed_entities.add(f"{_etype}:{_eid}")
+                gap_spec.update_coverage()
                 snippets.append(item)
                 level_added.append(item)
                 if len(level_added) >= level_budget or len(snippets) >= k_total:
@@ -1134,9 +1925,11 @@ async def build_auto_context(
             if len(level_added) >= level_budget or len(snippets) >= k_total:
                 break
         feedback_report = _feedback_term_report(
-            level_added,
+            [item for item in level_added if not item.get("_rejected_anchor_mismatch")],
             anchor_queries=[message, *[item.query for item in plan.variants], *feedback_terms],
         )
+        anchor_mismatch_count = sum(1 for item in level_added if item.get("_rejected_anchor_mismatch"))
+        accepted_level_added = [item for item in level_added if not item.get("_rejected_anchor_mismatch")]
         new_terms = feedback_report["accepted_terms"]
         feedback_terms = list(dict.fromkeys(feedback_terms + new_terms))[:12]
         level_reports.append(
@@ -1144,13 +1937,71 @@ async def build_auto_context(
                 "level": level,
                 "query_count": len(level_queries),
                 "queries": level_queries[:6],
-                "result_count": len(level_added),
+                "result_count": len(accepted_level_added),
                 "feedback_terms_added": new_terms[:8],
                 "rejected_feedback_terms": feedback_report["rejected_terms"][:8],
                 "rejected_feedback_result_count": feedback_report["rejected_result_count"],
                 "ungrounded_feedback_term_count": feedback_report["ungrounded_feedback_term_count"],
+                "anchor_mismatch_result_count": anchor_mismatch_count,
                 "feedback_terms_after": feedback_terms[:8],
             }
+        )
+        # WP-D: compute per-step rewards and record
+        _level_query_terms = set()
+        for _q in level_queries:
+            _level_query_terms |= set(important_terms(_q, 16))
+        _step_reward = {
+            "level": level,
+            "query_novelty": query_novelty(_level_query_terms, previous_query_terms),
+            "gap_closure_score": gap_closure_score(gap_spec_before, gap_spec),
+            "distractor_ratio": distractor_ratio(
+                accepted_level_added, _query_anchors_set, gap_spec
+            ),
+        }
+        step_rewards_collected.append(_step_reward)
+        # WP-D: backfill per-step reward metrics into corresponding level_report
+        level_reports[-1].update({
+            "gap_closure_score": _step_reward["gap_closure_score"],
+            "distractor_ratio": _step_reward["distractor_ratio"],
+            "query_novelty": _step_reward["query_novelty"],
+        })
+        # Module 3: per-term reward credit (side-channel from existing reward computation)
+        if VocabularyStore.enabled() and session_id:
+            _vs_reward = VocabularyStore()
+            _gc = _step_reward["gap_closure_score"]
+            _dr = _step_reward["distractor_ratio"]
+            for _term in (plan.search_frame.get("anchor_terms") or []):
+                _canon = _canonical_search_anchor(_term)
+                if _canon in ANCHOR_ALIASES or _canon in BIOMEDICAL_ACRONYM_TERMS:
+                    _vs_reward.record_outcome(
+                        _term, "session", session_id,
+                        gap_delta=_gc, distractor_pen=_dr, base_reward=0.5,
+                    )
+                    if run_id:
+                        _vs_reward.record_outcome(
+                            _term, "run", run_id,
+                            gap_delta=_gc, distractor_pen=_dr, base_reward=0.5,
+                        )
+        previous_query_terms.append(_level_query_terms)
+
+    # WP-C: replace semantics ? keep top-k by utility (SEAL-RAG style)
+    _max_ctx = int(getattr(settings.memory, "max_context_snippets", 12))
+    if len(snippets) > _max_ctx:
+        snippets.sort(
+            key=lambda _s: _snippet_utility(_s, _query_anchors_set, gap_spec),
+            reverse=True,
+        )
+        snippets = snippets[:_max_ctx]
+
+    # NER bootstrap: LLM entity grounding over all locally retrieved snippets
+    if getattr(settings.memory, "entity_grounding_enabled", True) and snippets:
+        await llm_ground_entities(
+            message,
+            snippets=snippets,
+            gap_spec=gap_spec,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            llm_api_format=llm_api_format,
         )
 
     payload = plan.to_dict()
@@ -1188,6 +2039,8 @@ async def build_auto_context(
             "feedback_terms": feedback_terms[:12],
             "retrieval_records": retrieval_records,
             "skipped_off_topic_count": skipped_off_topic,
+            "gap_spec": gap_spec.to_dict(),
+            "step_rewards": step_rewards_collected,
             "evidence_assembly": _evidence_assembly(
                 message=message,
                 plan=plan,
@@ -1196,4 +2049,22 @@ async def build_auto_context(
             ),
         }
     )
+    # Module 2 Point B: persist this turn's GapSpec entities to session vocab
+    if VocabularyStore.enabled() and session_id:
+        _vs_persist = VocabularyStore()
+        for _ent in gap_spec.confirmed_entities:
+            _vs_persist.record_outcome(
+                _ent, "session", session_id,
+                gap_delta=gap_spec.coverage_ratio,
+                distractor_pen=0.0,
+                base_reward=0.5,
+            )
+        for _ent in gap_spec.missing_entities:
+            _vs_persist.record_outcome(
+                _ent, "session", session_id,
+                gap_delta=0.0,
+                distractor_pen=0.2,
+                base_reward=0.5,
+            )
+        _vs_persist.expire_session(session_id)
     return {"snippets": snippets, "plan": payload}

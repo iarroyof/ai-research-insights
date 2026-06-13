@@ -74,8 +74,8 @@ class LLMCfg(BaseModel):
     base_url: str
     model: str
     chat_provider: str = "local"  # local | nvidia
-    max_input_tokens: int = 6000
-    max_output_tokens: int = 512
+    max_input_tokens: int = 128000
+    max_output_tokens: int = 2048
     temperature: float = 0.2
     top_p: float = 1.0
     context_manager_provider: str = "local"  # local | nvidia
@@ -83,35 +83,41 @@ class LLMCfg(BaseModel):
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_api_key: Optional[str] = None
     nvidia_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
-    nvidia_max_tokens: int = 2048
+    nvidia_max_tokens: int = 4096
+    provider_timeout_sec: int = 300
     nvidia_reasoning_effort: Optional[str] = None
     nvidia_enable_thinking: Optional[bool] = None
+    agent_models: dict = Field(default_factory=dict)
 
 class MemoryCfg(BaseModel):
     enabled: bool = True
     working_buffer_turns: int = 8
-    working_buffer_token_budget: int = 1800
-    memory_k: int = 8
-    triplet_k: int = 8
-    web_k: int = 3
-    token_budget_ratio: float = 0.45
+    working_buffer_token_budget: int = 48000
+    memory_k: int = 16
+    triplet_k: int = 16
+    web_k: int = 6
+    token_budget_ratio: float = 0.80
     episodic_summary_turns: int = 6
     lifecycle_update_k: int = 80
     eviction_importance_threshold: float = 0.25
-    allow_web_search_default: bool = False
+    allow_web_search_default: bool = True
     use_llm_reflection: bool = False
     shared_policy_enabled: bool = False
     reward_trace_enabled: bool = True
     auto_context_enabled: bool = True
-    auto_context_k: int = 8
-    auto_context_query_variants: int = 4
+    auto_context_k: int = 12
+    auto_context_query_variants: int = 5
     auto_context_llm_refine: bool = True
+    entity_grounding_enabled: bool = True
     auto_context_llm_notes: bool = True
     contradiction_threshold: float = 0.35
     nli_enabled: bool = True
     nli_provider: str = "hf_api"  # hf_api | http | llm | heuristic | local
     nli_endpoint: Optional[str] = None
     nli_model: str = "pritamdeka/PubMedBERT-MNLI-MedNLI"
+    nli_panel_enabled: bool = True
+    nli_panel_models: str = "pritamdeka/PubMedBERT-MNLI-MedNLI,shidey/deberta-v3-mednli-scifact-open-sentence-nli"
+    nli_panel_min_successes: int = 1
     hf_api_token: Optional[str] = None
     hf_api_base_url: str = "https://router.huggingface.co/hf-inference/models"
     hf_api_timeout_sec: int = 45

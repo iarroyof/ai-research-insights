@@ -22,6 +22,7 @@ class EvidenceSupport:
     nli_scores: dict[str, float]
     comparability: dict[str, Any]
     evidence: dict[str, Any]
+    nli_meta: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -173,12 +174,18 @@ async def assess_claim_support(
         for (evidence, premise, comparability), nli in zip(pending_nli, nli_results):
             scores = _scores(nli)
             label = str(nli.get("label") or max(scores, key=lambda k: scores[k]))
+            nli_meta = {
+                key: value
+                for key, value in nli.items()
+                if key not in {"label", "entailment", "contradiction", "neutral"}
+            }
             support_items.append(
                 EvidenceSupport(
                     evidence_id=str(evidence.get("evidence_id") or _stable_id(premise)),
                     status=_status_from_nli(scores),
                     nli_label=label,
                     nli_scores=scores,
+                    nli_meta=nli_meta,
                     comparability=comparability,
                     evidence=evidence,
                 )
@@ -273,6 +280,13 @@ def evidence_table_debug_payload(table: dict[str, Any]) -> dict[str, Any]:
                         "status": item.get("status"),
                         "label": item.get("nli_label"),
                         "scores": item.get("nli_scores", {}),
+                        "metadata": item.get("nli_meta", {}),
+                        "provider": (item.get("nli_meta") or {}).get("provider"),
+                        "model": (item.get("nli_meta") or {}).get("model"),
+                        "panel_success_count": (item.get("nli_meta") or {}).get("panel_success_count"),
+                        "panel_size": (item.get("nli_meta") or {}).get("panel_size"),
+                        "panel_agreement": (item.get("nli_meta") or {}).get("panel_agreement"),
+                        "panel": (item.get("nli_meta") or {}).get("panel"),
                         "premise_sentence": (item.get("evidence") or {}).get("sentence_text"),
                         "hypothesis_claim": claim.get("claim"),
                         "source_sentence_id": (item.get("evidence") or {}).get("sent_id"),

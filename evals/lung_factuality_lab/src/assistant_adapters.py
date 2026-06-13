@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
@@ -72,7 +74,11 @@ class HttpChatAdapter:
             "message": turn.message,
             "session_id": f"eval_{self.run_namespace}_{scenario.scenario_id}",
             "items": [],
-            "options": {"allow_auto_context": True, "expose_memory_debug": True},
+            "options": {
+                "allow_auto_context": True,
+                "allow_web_search": True,
+                "expose_memory_debug": True,
+            },
         }
         api_key = self.api_key or os.getenv("API_KEY", "")
         req = urllib.request.Request(
@@ -87,36 +93,69 @@ class HttpChatAdapter:
         )
         chunks: list[str] = []
         event_meta: dict[str, object] = {}
-        with urllib.request.urlopen(req, timeout=self.request_timeout) as res:
-            for raw in res:
-                line = raw.decode("utf-8", errors="ignore").strip()
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if data == "[DONE]":
-                    break
-                try:
-                    event = json.loads(data)
-                    if event.get("type") == "token":
-                        chunks.append(str(event.get("data") or ""))
-                    elif event.get("type") in {
-                        "citations",
-                        "memory_debug",
-                        "reward",
-                        "evidence_table",
-                        "conversation_frame",
-                        "semantic_drift_trace",
-                    }:
-                        event_meta[event.get("type")] = event.get("data") or {}
-                    elif event.get("type") == "consistency_warning":
-                        event_meta.setdefault("consistency_warning", []).append(event.get("data") or {})
-                except Exception:
-                    pass
+        started_at = time.monotonic()
+        deadline = started_at + max(1.0, float(self.request_timeout))
+        done_seen = False
+        socket_timeout = max(1.0, float(self.request_timeout))
+        try:
+            with urllib.request.urlopen(req, timeout=socket_timeout) as res:
+                for raw in res:
+                    if time.monotonic() > deadline:
+                        event_meta["adapter_timeout"] = {
+                            "message": "HTTP chat stream exceeded the adapter wall-clock request timeout.",
+                            "request_timeout": self.request_timeout,
+                            "elapsed_sec": round(time.monotonic() - started_at, 3),
+                        }
+                        break
+                    line = raw.decode("utf-8", errors="ignore").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        done_seen = True
+                        break
+                    try:
+                        event = json.loads(data)
+                        if event.get("type") == "token":
+                            chunks.append(str(event.get("data") or ""))
+                        elif event.get("type") in {
+                            "citations",
+                            "memory_debug",
+                            "reward",
+                            "evidence_table",
+                            "conversation_frame",
+                            "semantic_drift_trace",
+                        }:
+                            event_meta[event.get("type")] = event.get("data") or {}
+                        elif event.get("type") == "consistency_warning":
+                            event_meta.setdefault("consistency_warning", []).append(event.get("data") or {})
+                    except Exception as exc:
+                        event_meta.setdefault("adapter_parse_warnings", []).append(
+                            {"error_type": exc.__class__.__name__, "line_preview": line[:200]}
+                        )
+        except Exception as exc:
+            event_meta["adapter_error"] = {
+                "message": "HTTP chat adapter failed while reading the endpoint stream.",
+                "error_type": exc.__class__.__name__,
+                "detail": str(exc)[:500],
+                "request_timeout": self.request_timeout,
+                "elapsed_sec": round(time.monotonic() - started_at, 3),
+            }
+        answer_text = "".join(chunks).strip()
+        if not answer_text:
+            answer_text = _http_adapter_fallback_answer(event_meta)
+            event_meta["adapter_empty_answer_fallback"] = True
+        event_meta["adapter_stream"] = {
+            "done_seen": done_seen,
+            "elapsed_sec": round(time.monotonic() - started_at, 3),
+            "token_chunk_count": len(chunks),
+            "request_timeout": self.request_timeout,
+        }
         return AssistantAnswer(
             scenario_id=scenario.scenario_id,
             turn=turn.turn,
             assistant=self.name,
-            answer="".join(chunks).strip(),
+            answer=answer_text,
             adapter_meta={"endpoint": self.endpoint, "session_namespace": self.run_namespace, **event_meta},
         )
 
@@ -218,6 +257,30 @@ def build_adapter(
             raise ValueError("--endpoint is required for http/target_chatbot adapter")
         return HttpChatAdapter(endpoint=endpoint, api_key=api_key, tenant_id=tenant_id, request_timeout=request_timeout, name=name)
     raise ValueError(f"Unknown assistant adapter: {name}")
+
+
+def _http_adapter_fallback_answer(event_meta: dict[str, object]) -> str:
+    telemetry = event_meta.get("citations") if isinstance(event_meta, dict) else {}
+    generation = telemetry.get("generation_telemetry", {}) if isinstance(telemetry, dict) else {}
+    puzzle = generation.get("puzzle_state", {}) if isinstance(generation, dict) else {}
+    lines = [
+        "The live chat endpoint did not return textual answer tokens for this turn. "
+        "The evaluation can continue using the retrieved telemetry and this fallback diagnosis."
+    ]
+    if puzzle:
+        edge_status = puzzle.get("edge_support_status") or "unknown"
+        covered = ", ".join(str(item) for item in (puzzle.get("covered_nodes") or [])[:6])
+        missing = ", ".join(str(item) for item in (puzzle.get("missing_nodes") or [])[:6])
+        lines.append(f"Evidence puzzle edge support: {edge_status}.")
+        if covered:
+            lines.append(f"Covered nodes: {covered}.")
+        if missing:
+            lines.append(f"Missing nodes: {missing}.")
+    if event_meta.get("adapter_timeout"):
+        lines.append("Adapter note: the stream exceeded the configured wall-clock timeout.")
+    if event_meta.get("adapter_error"):
+        lines.append("Adapter note: the endpoint stream failed before a complete textual answer was read.")
+    return "\n".join(lines)
 
 
 def _correct_answer(user: str, scenario: Scenario) -> str:

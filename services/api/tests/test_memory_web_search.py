@@ -185,6 +185,42 @@ class FakeEmptyEutilsAsyncClient(FakeEutilsAsyncClient):
         raise AssertionError("empty ESearch must not fetch XML")
 
 
+class FakePMCFullTextAsyncClient:
+    gets = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, url, params):
+        self.gets.append({"url": url, "params": params})
+        return FakeResponse(
+            text="""
+            <pmc-articleset>
+              <article>
+                <front>
+                  <article-meta>
+                    <article-id pub-id-type="pmc">PMC999</article-id>
+                    <article-id pub-id-type="pmid">999</article-id>
+                    <title-group><article-title>Fungi and tumorigenesis review</article-title></title-group>
+                  </article-meta>
+                </front>
+                <body>
+                  <p>Other background text describes unrelated sequencing methods.</p>
+                  <p>Different cancers exhibit cancer type-specific fungal profiles, including reported fungal species in tumor tissues.</p>
+                  <p>Fungi may influence tumorigenesis through host immunity and bioactive metabolites.</p>
+                </body>
+              </article>
+            </pmc-articleset>
+            """
+        )
+
+
 class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
     async def test_duckduckgo_search_redacts_query_and_flattens_related_topics(self):
         from app.memory.web_search import duckduckgo_search
@@ -342,7 +378,7 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
 
         variants = _external_query_variants(
             "what fungi are described as playing essential roles in tumorigenesis and how it happens",
-            limit=3,
+            limit=4,
         )
         joined = " ".join(variants).lower()
 
@@ -351,6 +387,7 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tumorigenesis", joined)
         self.assertIn("mechanism", joined)
         self.assertIn("species", joined)
+        self.assertTrue(any(term in joined for term in ("mycobiome", "mycobiota", "fungal", "fungus")))
         self.assertNotIn("candida albicans", joined)
 
     def test_external_query_variants_preserve_specific_user_entity_without_fixed_species_bridge(self):
@@ -360,7 +397,7 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
         joined = " ".join(variants).lower()
 
         self.assertIn("candida", joined)
-        self.assertIn("tumorgenesis", joined)
+        self.assertIn("tumorigenesis", joined)
         self.assertNotIn("candida albicans promotes tumorigenesis", joined)
 
     def test_external_ranking_promotes_semantic_pubtator_title(self):
@@ -381,6 +418,141 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(merged[0]["pmid"], "34298645")
         self.assertGreater(merged[0]["external_rank_score"], merged[1]["external_rank_score"])
 
+    def test_external_ranking_promotes_anchor_covered_results(self):
+        from app.memory.policy import _merge_external_results
+
+        merged = _merge_external_results(
+            [
+                {
+                    "source": "pubmed",
+                    "pmid": "1",
+                    "title": "Broad microbiome and cancer review",
+                    "snippet": "The microbiome can affect cancer through immune and metabolic pathways.",
+                },
+            ],
+            [
+                {
+                    "source": "pubtator3",
+                    "pmid": "2",
+                    "title": "Fungi and tumors",
+                    "snippet": "Fungi influence tumorigenesis through host immunity and bioactive metabolites.",
+                },
+            ],
+            2,
+            [],
+            "fungi tumorigenesis mechanism examples species",
+        )
+
+        self.assertEqual(merged[0]["pmid"], "2")
+        self.assertEqual(merged[0]["external_anchor_covered"], ["fungi", "tumorigenesis"])
+
+    def test_external_ranking_prefers_full_anchor_coverage_over_partial(self):
+        from app.memory.policy import _merge_external_results
+
+        merged = _merge_external_results(
+            [
+                {
+                    "source": "pubmed",
+                    "pmid": "1",
+                    "title": "Cancer signaling and tumorigenesis",
+                    "snippet": "Cancer signaling pathways can contribute to tumorigenesis.",
+                    "score": 1.0,
+                },
+            ],
+            [
+                {
+                    "source": "pubtator3",
+                    "pmid": "2",
+                    "title": "Fungi and tumorigenesis",
+                    "snippet": "Fungi influence tumorigenesis through host immunity.",
+                    "score": 0.1,
+                },
+            ],
+            2,
+            [],
+            "fungi tumorigenesis mechanism examples species",
+        )
+
+        self.assertEqual(merged[0]["pmid"], "2")
+
+    def test_external_attempt_quality_requests_retry_when_anchor_coverage_is_weak(self):
+        from app.memory.policy import _external_attempt_quality
+
+        quality = _external_attempt_quality(
+            "fungi tumorigenesis mechanism",
+            [
+                {
+                    "source": "pubmed",
+                    "title": "Tumorigenesis signaling",
+                    "snippet": "Cancer signaling can affect tumorigenesis.",
+                    "external_anchor_covered": ["tumorigenesis"],
+                }
+            ],
+        )
+
+        self.assertEqual(quality["stop_reason"], "retry_recommended")
+        self.assertLess(quality["score"], 0.72)
+
+    def test_external_retry_queries_use_source_feedback_without_literal_meta_terms(self):
+        from app.memory.policy import _external_retry_queries
+
+        queries = _external_retry_queries(
+            "search more on all your available data sources fungi tumorigenesis",
+            ["fungi tumorigenesis"],
+            [
+                {
+                    "source": "pubtator3",
+                    "title": "Fungi and tumorigenesis mechanisms",
+                    "snippet": "Candida tropicalis promotes colorectal carcinogenesis through inflammasome activation.",
+                    "external_anchor_covered": ["fungi", "tumorigenesis"],
+                }
+            ],
+            limit=2,
+        )
+        joined = " ".join(queries).lower()
+
+        self.assertIn("fungi", joined)
+        self.assertIn("tumorigenesis", joined)
+        self.assertIn("candida", joined)
+        self.assertNotIn("available data", joined)
+
+    def test_external_planner_query_filter_rejects_source_specific_drift(self):
+        from app.memory.policy import _external_query_preserves_seed
+
+        self.assertTrue(
+            _external_query_preserves_seed(
+                "fungi tumorigenesis",
+                "fungi tumorigenesis mechanism pathogenesis immune inflammation species review",
+            )
+        )
+        self.assertFalse(
+            _external_query_preserves_seed(
+                "fungi tumorigenesis",
+                "fungi tumorigenesis multidimensional exploration between gut microbiota colorectal cancer focus clinical treatment received considerable attention field crc",
+            )
+        )
+
+    def test_external_retry_ignores_partial_anchor_feedback(self):
+        from app.memory.policy import _external_retry_queries
+
+        queries = _external_retry_queries(
+            "fungi tumorigenesis",
+            ["fungi tumorigenesis"],
+            [
+                {
+                    "source": "pmc",
+                    "title": "Gut microbiota and colorectal tumorigenesis",
+                    "snippet": "Clinical treatment and CRC progression are reviewed.",
+                    "external_anchor_covered": ["tumorigenesis"],
+                }
+            ],
+            limit=2,
+        )
+        joined = " ".join(queries).lower()
+
+        self.assertNotIn("colorectal", joined)
+        self.assertNotIn("clinical treatment", joined)
+
     async def test_pubmed_fetch_by_pmids_enriches_pubtator_title_hits(self):
         from app.memory.web_search import pubmed_fetch_by_pmids
 
@@ -391,6 +563,24 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("123", result)
         self.assertEqual(result["123"]["snippet"], "CAF-derived HGF activates MET in lung cancer.")
         self.assertEqual(FakeEutilsAsyncClient.gets[0]["params"]["id"], "123")
+
+    async def test_pmc_relevant_sentence_search_deepens_known_pmc_articles(self):
+        from app.memory.web_search import pmc_relevant_sentence_search
+
+        FakePMCFullTextAsyncClient.gets = []
+        with patch("httpx.AsyncClient", FakePMCFullTextAsyncClient):
+            result = await pmc_relevant_sentence_search(
+                "fungi tumorigenesis mechanism examples species immunity metabolites",
+                ["PMC999"],
+                k=2,
+            )
+
+        self.assertEqual(FakePMCFullTextAsyncClient.gets[0]["params"]["db"], "pmc")
+        self.assertEqual(FakePMCFullTextAsyncClient.gets[0]["params"]["id"], "999")
+        self.assertEqual(result["results"][0]["source"], "pmc_fulltext_sentence")
+        joined = " ".join(item["snippet"] for item in result["results"]).lower()
+        self.assertIn("fungal profiles", joined)
+        self.assertIn("host immunity", joined)
 
     async def test_external_enrichment_replaces_sparse_pubtator_snippet(self):
         from app.memory.policy import _enrich_external_results
@@ -403,6 +593,19 @@ class MemoryWebSearchTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(enriched[0]["abstract_enriched"])
         self.assertIn("Long abstract evidence", enriched[0]["snippet"])
+
+    def test_external_retrieval_seed_uses_conversation_frame_for_search_more(self):
+        from app.memory.policy import _external_retrieval_seed
+
+        seed = _external_retrieval_seed(
+            "search more on all your available data sources",
+            {"active_terms": ["fungi", "tumorigenesis", "how", "happens"]},
+        )
+
+        self.assertIn("fungi", seed)
+        self.assertIn("tumorigenesis", seed)
+        self.assertIn("mechanism", seed)
+        self.assertNotIn("available data", seed)
 
 
 if __name__ == "__main__":

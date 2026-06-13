@@ -5,6 +5,7 @@ import base64
 import hmac
 import json
 import os
+import re
 from pathlib import Path
 
 import httpx
@@ -148,6 +149,27 @@ def fetch_model_catalog(api: str, tenant: str, api_key: str) -> list[dict]:
         },
         {
             "provider": "nvidia",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "api_format": "openai_chat",
+            "available": False,
+            "source": "fallback",
+        },
+        {
+            "provider": "nvidia",
+            "model": "nvidia/nemotron-3-super-120b-a12b",
+            "api_format": "openai_chat",
+            "available": False,
+            "source": "fallback",
+        },
+        {
+            "provider": "nvidia",
+            "model": "nvidia/nemotron-3-nano-30b-a3b",
+            "api_format": "openai_chat",
+            "available": False,
+            "source": "fallback",
+        },
+        {
+            "provider": "nvidia",
             "model": "nvidia/llama-3.1-nemotron-70b-instruct",
             "api_format": "openai_chat",
             "available": False,
@@ -201,6 +223,27 @@ def selected_model_payload(prefix: str, item: dict) -> dict:
     }
 
 
+def extract_clarification_options(text: str) -> list:
+    """Parse lettered option lists (a/b/c...) from model response text."""
+    lines = text.split("\n")
+    options = []
+    opt_re = re.compile(r"^\s*\(?([a-z])\)?[.:\)]\s*(.+)", re.IGNORECASE)
+    for line in lines:
+        m = opt_re.match(line.rstrip())
+        if m:
+            letter = m.group(1).lower()
+            desc = m.group(2).strip()
+            if desc:
+                options.append((letter, desc))
+    if len(options) >= 2:
+        letters = [o[0] for o in options]
+        if (letters[0] == "a" and
+                all(ord(letters[i]) == ord(letters[i - 1]) + 1
+                    for i in range(1, min(len(letters), 5)))):
+            return options[:5]
+    return []
+
+
 def render_chat():
     models = fetch_model_catalog(API, TENANT, API_KEY)
 
@@ -208,6 +251,11 @@ def render_chat():
         st.session_state["chat_messages"] = []
     if "chat_session_id" not in st.session_state:
         st.session_state["chat_session_id"] = None
+    if "clarif_submitted_turns" not in st.session_state:
+        st.session_state["clarif_submitted_turns"] = set()
+    if "turn_ratings" not in st.session_state:
+        st.session_state["turn_ratings"] = {}
+    injected_msg = st.session_state.pop("pending_message", None)
 
     top_left, top_right = st.columns([4, 1])
     with top_left:
@@ -220,21 +268,34 @@ def render_chat():
             st.session_state["chat_messages"] = []
             st.session_state["chat_session_id"] = None
             st.session_state["memory_diagnostics"] = {}
+            st.session_state["clarif_submitted_turns"] = set()
+            st.session_state["turn_ratings"] = {}
+            st.session_state.pop("pending_message", None)
             st.rerun()
 
     with st.expander("Models, context, retrieval, and diagnostics", expanded=False):
         model_col, context_col = st.columns(2)
-        with model_col:
-            chat_model = select_model("Chat model", "chat_model_choice", models)
-        with context_col:
-            use_same_model = st.checkbox("Use chat model for context manager and search agents", value=True)
-            context_model = chat_model if use_same_model else select_model("Context/search model", "context_model_choice", models)
+        use_agent_routing = st.checkbox(
+            "Use server-side per-agent model routing",
+            value=False,
+            help="Each stage uses its configured model: frame->nemotron-super-49b, context_manager->nemotron-3-super-120b (reasoning=medium), answer->nemotron-super-49b, reflection->nemotron-super-49b",
+        )
+        if not use_agent_routing:
+            with model_col:
+                chat_model = select_model("Chat model", "chat_model_choice", models)
+            with context_col:
+                use_same_model = st.checkbox("Use chat model for context manager and search agents", value=True)
+                context_model = chat_model if use_same_model else select_model("Context/search model", "context_model_choice", models)
+        else:
+            st.caption("Per-agent routing active · frame: nemotron-super-49b · context: nemotron-3-super-120b (reasoning=med) · answer: nemotron-super-49b · reflection: nemotron-super-49b")
+            chat_model = None
+            context_model = None
 
         retrieval_col, debug_col = st.columns(2)
         with retrieval_col:
             allow_extra = st.checkbox("Allow extra retrieval if pinned < 3", value=False)
             allow_auto_context = st.checkbox("Auto-search evidence when nothing is pinned", value=True)
-            allow_web_search = st.checkbox("Use privacy-filtered DuckDuckGo context if local memory is sparse", value=False)
+            allow_web_search = st.checkbox("Use privacy-filtered DuckDuckGo context if local memory is sparse", value=True)
         with debug_col:
             expose_memory_debug = st.checkbox("Show memory debug events", value=False)
             if models:
@@ -244,10 +305,9 @@ def render_chat():
         selected_items = st.session_state.get("selected_papers", [])
         if selected_items:
             st.info(f"{len(selected_items)} items pinned as context")
-            with st.expander("Pinned context"):
-                for item in selected_items[:8]:
-                    st.caption(f"**{item.get('subject')}** - {item.get('relation')} - **{item.get('object')}**")
-                    st.text(item.get("text", "")[:240] + ("..." if len(item.get("text", "")) > 240 else ""))
+            for item in selected_items[:8]:
+                st.caption(f"**{item.get('subject')}** - {item.get('relation')} - **{item.get('object')}**")
+                st.text(item.get("text", "")[:240] + ("..." if len(item.get("text", "")) > 240 else ""))
         else:
             st.info("No pinned context. Chat can auto-search local evidence when enabled.")
 
@@ -305,7 +365,42 @@ def render_chat():
                 with st.expander("Memory debug"):
                     st.json(entry["debug"])
 
-    msg = st.chat_input("Ask Sabia")
+    # ── Human feedback: star rating + clarification checkboxes ──
+    last_asst_idx = None
+    for _i, _e in enumerate(st.session_state["chat_messages"]):
+        if _e.get("role") == "assistant":
+            last_asst_idx = _i
+    if last_asst_idx is not None:
+        _last = st.session_state["chat_messages"][last_asst_idx]
+        _turn_id = last_asst_idx
+        _ratings = st.session_state["turn_ratings"]
+        if _turn_id not in _ratings:
+            _r = st.feedback("stars", key=f"feedback_{_turn_id}")
+            if _r is not None:
+                _ratings[_turn_id] = _r + 1  # feedback() returns 0-4
+                st.session_state["turn_ratings"] = _ratings
+        else:
+            _stars = '\u2b50' * _ratings[_turn_id]
+            st.caption(f"Your rating: {_stars}")
+        _clarif_opts = _last.get("clarification_options") or []
+        _form_key = f"clarif_done_{_turn_id}"
+        if _clarif_opts and _turn_id not in st.session_state["clarif_submitted_turns"]:
+            st.divider()
+            with st.form(f"clarif_form_{_turn_id}"):
+                st.caption("Select the option(s) that match your intent (or type your own):")
+                _selected_descs = []
+                for _letter, _desc in _clarif_opts:
+                    if st.checkbox(f"**{_letter.upper()})** {_desc}", key=f"ck_{_turn_id}_{_letter}"):
+                        _selected_descs.append(_desc)
+                _other_text = st.text_input("Other (describe your intent):", key=f"other_{_turn_id}")
+                if st.form_submit_button("\u2192 Send selection"):
+                    st.session_state["clarif_submitted_turns"].add(_turn_id)
+                    _parts = _selected_descs + ([_other_text.strip()] if _other_text.strip() else [])
+                    if _parts:
+                        st.session_state["pending_message"] = "; ".join(_parts)
+                    st.rerun()
+
+    msg = injected_msg or st.chat_input("Ask Sabia")
     if not msg:
         return
 
@@ -328,8 +423,8 @@ def render_chat():
                 "allow_auto_context": allow_auto_context,
                 "allow_web_search": allow_web_search,
                 "expose_memory_debug": expose_memory_debug,
-                **selected_model_payload("chat", chat_model),
-                **selected_model_payload("context", context_model),
+                **(selected_model_payload("chat", chat_model) if chat_model is not None else {}),
+                **(selected_model_payload("context", context_model) if context_model is not None else {}),
             }
             payload = {"message": msg, "items": selected_items, "options": payload_options}
             if st.session_state["chat_session_id"]:
@@ -394,6 +489,7 @@ def render_chat():
                     "citations": citations_data,
                     "warnings": warnings_data,
                     "debug": debug_data,
+                    "clarification_options": extract_clarification_options(answer_text),
                 }
             )
     except httpx.RemoteProtocolError:
@@ -406,6 +502,7 @@ def render_chat():
                     "citations": citations_data,
                     "warnings": warnings_data + [{"message": "Stream interrupted before final event."}],
                     "debug": debug_data,
+                    "clarification_options": extract_clarification_options(answer_text),
                 }
             )
     except Exception as e:

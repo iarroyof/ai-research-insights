@@ -73,3 +73,32 @@ class ClaimSupportTests(unittest.IsolatedAsyncioTestCase):
         assert table["doc_type"] == "evidence_table"
         assert table["status_counts"]["entailed"] == 1
         assert debug["claims"][0]["status"] == "entailed"
+
+    async def test_evidence_table_debug_payload_preserves_nli_panel_metadata(self):
+        async def fake_panel_nli(premise: str, hypothesis: str):
+            return {
+                "label": "entailment",
+                "entailment": 0.91,
+                "contradiction": 0.02,
+                "neutral": 0.07,
+                "provider": "nli_panel",
+                "model": "panel",
+                "panel_success_count": 2,
+                "panel_size": 2,
+                "panel_agreement": 1.0,
+                "panel": [
+                    {"model": "model-a", "label": "entailment"},
+                    {"model": "model-b", "label": "entailment"},
+                ],
+            }
+
+        claims = extract_atomic_claims("Aspirin inhibits platelet aggregation.")
+        evidence = gather_evidence_candidates(prompt_context=[{"sentence_text": ASPIRIN_PREMISE, "sent_id": "s1"}])
+        support = await assess_claim_support(claims, evidence, nli_func=fake_panel_nli)
+        table = build_evidence_table(answer_id="answer-2", session_id="session-1", turn_index=3, claim_support=support, tenant="default")
+        nli_debug = evidence_table_debug_payload(table)["claims"][0]["nli"][0]
+
+        assert nli_debug["provider"] == "nli_panel"
+        assert nli_debug["model"] == "panel"
+        assert nli_debug["panel_success_count"] == 2
+        assert len(nli_debug["panel"]) == 2

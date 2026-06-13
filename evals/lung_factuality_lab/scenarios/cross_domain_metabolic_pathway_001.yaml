@@ -1,0 +1,27 @@
+scenario_id: cross_domain_metabolic_pathway_001
+description: >
+  Cross-domain query about metabolic pathway dysregulation NOT specific to
+  lung cancer.  Tests that the system retrieves relevant mechanistic evidence
+  from non-oncology literature without requiring cancer-domain anchors.
+query: >
+  What metabolic pathway dysregulation connects mitochondrial dysfunction to
+  inflammatory cytokine production in macrophages?
+expected_entities:
+  - NF-kB
+  - NLRP3
+  - ROS
+  - IL-1beta
+  - TCA cycle
+expected_not_present:
+  - NSCLC
+  - lung adenocarcinoma
+  - tumor microenvironment
+gold_mechanisms:
+  - mitochondrial ROS activates NLRP3 inflammasome
+  - succinate accumulation stabilizes HIF-1alpha
+  - NF-kB drives IL-1beta transcription
+trap_statements:
+  - "This pathway is specific to lung cancer progression."
+  - "NLRP3 only functions in tumor-associated macrophages."
+reward_shape: shape8
+stage: 1

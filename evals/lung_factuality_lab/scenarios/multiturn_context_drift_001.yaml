@@ -1,0 +1,70 @@
+scenario_id: multiturn_context_drift_001
+description: >
+  Multi-turn topic continuity. User follows up with an implicit/vague message
+  ("yes, elaborate on that", "what about the second one", "I meant the other")
+  that contains no biomedical anchors. System must retrieve relevant prior context
+  and not drift to unrelated topics.
+
+query: >
+  How do Aspergillus species interact with lung cancer chemotherapy outcomes?
+
+session_context:
+  prior_turn_model_response: >
+    Aspergillus can impair chemotherapy in two key ways: first through
+    immunosuppression that allows drug-resistant clones to emerge, and second
+    through direct enzymatic degradation of some chemotherapy agents. The second
+    mechanism is less studied but increasingly documented in immunocompromised patients.
+
+expected_entities:
+  - Aspergillus
+  - lung cancer
+  - chemotherapy
+  - immunosuppression
+  - drug resistance
+  - immunocompromised
+
+expected_not_present:
+  - BRCA1
+  - breast cancer
+  - melanoma
+
+gold_mechanisms:
+  - id: mech_aspergillus_chemo_resistance
+    description: Aspergillus-induced immunosuppression promotes chemotherapy drug resistance
+    entities: [Aspergillus, immunosuppression, drug resistance, chemotherapy]
+    supports: [Aspergillus -> immunosuppression -> drug-resistant tumor clones]
+  - id: mech_enzyme_drug_degradation
+    description: Aspergillus enzymes may degrade some chemotherapy compounds
+    entities: [Aspergillus, enzyme, chemotherapy, drug degradation]
+    supports: [Aspergillus enzyme activity -> chemotherapy degradation]
+
+trap_statements:
+  - id: trap_vague_lost
+    text: "The vague reply 'yes, elaborate on that' has no resolvable referent"
+    is_trap: true
+  - id: trap_topic_drift
+    text: "A short follow-up message means the user wants to change topic entirely"
+    is_trap: true
+
+reward_shape:
+  name: multiturn_context_drift
+  weights:
+    factual_accuracy: 0.30
+    entity_coverage: 0.25
+    no_hallucination: 0.20
+    inter_turn_coreference: 0.15
+    conversation_continuity: 0.10
+
+stage: multiturn_coreference_eval
+
+coreference_test:
+  user_reply: "yes, elaborate on the second one"
+  expected_resolution:
+    intent: prior_context
+    must_contain_entities:
+      - enzyme
+      - drug degradation
+      - Aspergillus
+    must_not_contain:
+      - BRCA1
+      - breast cancer

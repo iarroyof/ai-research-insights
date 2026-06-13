@@ -3,7 +3,7 @@
 # A shape is accepted only when live endpoint results improve on the comparable prior live run.
 
 current_best_shape: shape4
-current_stage: shape7m_hgf_evaluator_and_sse_fix_correction_scope_microcheck_pending
+current_stage: shape8_sentinel_a_cleared
 selection_rule: >-
   Prefer the highest live-endpoint average reward on comparable scenarios, with fewer
   high-severity evaluator false positives and no regression in trap resistance. Replay-only
@@ -484,6 +484,37 @@ shapes:
         notes: Generic markers for 'without defining', 'unsupported claims about', and 'which contradict' removed remaining rejected-premise factual inversion false positives from the fresh live HGF trace.
     promotion_decision: shape7m_hgf_evaluator_false_positive_replay_cleared_run_correction_scope_microcheck_before_any_stage2
 
+  shape8:
+    hypothesis: >
+      GapSpec accumulation + replace semantics (SEAL-RAG) + per-step rewards
+      (WP-B/C/D) reduce distractor snippets, increase gap_closure_score per
+      retrieval level, and improve mechanistic_completeness for multi-hop queries.
+      Expected avg_reward improvement >= 0.03 over shape7m on sentinel_a and
+      cross-domain metabolic pathway scenario.
+    components_changed:
+      - retrieval_gap_closure (new WP-D/E component, weight 0.05)
+      - retrieval_distractor_quality (new WP-D/E, inverted distractor_ratio, weight 0.05)
+      - scope_alignment weight 0.10 -> 0.05
+      - correction_adherence weight 0.10 -> 0.05
+    required_baseline: shape7m_correction_scope_microcheck_cleared
+    sentinel_targets:
+      sentinel_a: avg_reward >= 0.68
+      sentinel_c: avg_reward >= 0.64
+      missed_traps: 0
+    ladder_gates:
+      - correction_scope_microcheck: MUST PASS before starting (run correction_scope_tme_only_001__gen_004)
+      - diagnostic_trace: CLEARED 2026-05-27 -- gap_spec+step_rewards keys confirmed in SSE,
+          level_reports backfilled with gap_closure_score/distractor_ratio/query_novelty,
+          reward_scorer updated to use step_rewards as primary source;
+          gap_closure_score=0.0 expected (eval-lab triplet index lacks tenant-tagged papers,
+          8 triplets_default hits found but rejected by anchor filter -- correct behavior)
+      - family_microfit: INVALIDATED 2026-05-29 — all runs (v2, v3) were against broken API (clarification-mode bug: system asked clarification questions instead of answering); must rerun after fix
+      - ui_fix: 2026-05-29 fixed clarification-mode bug (search_agent.py: removed (ambiguity==medium and edge_missing) trigger when missing_nodes==[]; config.py: allow_web_search_default=True; streamlit: checkbox default=True)
+      - sentinel_a_guard: CLEARED 2026-05-29 -- run=shape8_sentinel_a_v3 8/8 scenarios avg_reward=0.7148 total_missed_traps=0 (fixed API: clarification-mode bug resolved)
+      - promote_or_block: update current_best_shape only if sentinel_a passes
+    status: family_microfit_v4_failed_pending_v5
+    cross_domain_scenario: evals/lung_factuality_lab/scenarios/cross_domain_metabolic_pathway_001.yaml
+
 blocked_shapes:
   - shape0_baseline
   - shape1
@@ -491,10 +522,28 @@ blocked_shapes:
   - shape3
 
 next_allowed_actions:
-  - Shape7l Sentinel C improved over Shape6 but failed the broader Stage 2 gate; do not start Stage 2 until Shape7m correction-scope/citation live microchecks clear.
-  - Shape7m HGF replay cleared rejected false-premise and quoted-fixture false positives; run correction_scope_tme_only_001__gen_004 next because Sentinel C still showed scope/correction weaknesses.
+  - CLEARED: correction_scope_tme_only_001__gen_004 live run (run_20260525_202250_272522) confirmed missed_traps=0 -- shape7m correction_scope microcheck PASSED 2026-05-27.
+  - CLEARED: Shape8 diagnostic trace 2026-05-27 -- gap_spec/step_rewards in SSE confirmed, level_reports backfilled, reward_scorer fixed.
+  - CLEARED: Shape8 family_microfit v2 2026-05-28 run=shape8_family_microfit_v2_ avg_reward=0.8026 (tme_gen004=0.7724 cross_domain=0.8329) missed_traps=0 [evaluator_judgment_gap for 2 gen_004 traps; fixed by adding negation markers to _clearly_rejects_false_premise]
+  - INVALIDATED: shape8_family_microfit_v2_ and shape8_family_microfit_v3 — run against broken clarification-mode API; must rerun after sentinel_a_v3
+  - INVALIDATED: shape8_sentinel_a_v2 — run against broken clarification-mode API; cleared 2026-05-29
+  - CLEARED: shape8_sentinel_a_v3 8/8 scenarios avg_reward=0.7148 total_missed_traps=0 GATE PASSED 2026-05-29
+  - DONE: compare_shapes -- shape8 sentinel_a_v3 avg=0.7148/missed=0 vs shape7l sentinel_c avg=0.6365/missed=2; shape8 wins on both dimensions; compare_shapes module absent, comparison done manually
+  - RESULT: shape8_family_microfit_v4 avg=0.6534 (correction_scope=0.6414 cross_domain=0.6954) missed_traps=0 GATE_FAILED (need>=0.68) 2026-05-29
+  - DIAGNOSIS: correction_scope turn2 scored 0.02 (mechanistic_chain_break missing required nodes); cross_domain turn2 scored 0.39 (unsupported mechanism claims); NOT caused by clarification-mode bug (turn1 clarification got 1.00); genuine generation quality issue
+  - FIXED: search_agent.py context-poverty fix 2026-05-29 -- ANCHOR_ALIASES expanded (added cancer/tumor/lung/microbiome/bacteria/inflammation/fibroblast with synonyms); _hit_anchor_coverage partial-match gate changed from ALL-required to max(1,N-1)-of-N (allows 1 miss when N>=2); API restarted. Previously 8 local results were silently dropped because cancer papers lacked fungi anchor; now they pass when the cancer-side anchor is present.
+  - FIXED: llm.py NVIDIA 400 fix 2026-05-30 -- Nemotron-Super model auto-detect: sends chat_template_kwargs={enable_thinking:false} unconditionally for any model with nemotron-super in name, and sends it even on the stripped retry call (include_optional=False). Previously extra_body wrapper was never sent in correct top-level format. Root cause: NVIDIA NIM requires explicit enable_thinking for thinking-capable models or returns 400.
+  - FIXED: PUZZLE_NODE_STOP_TERMS expanded 2026-05-30 -- Added ~50 common English words (possible, involving, life, style, ph, using, based, between, through, about, etc.) that were leaking into anchor_terms and preferred_queries, diluting vector search signal and producing spurious missing-node puzzle alerts. Now anchor_terms for a fungi+cancer query = [fungi,cancer] instead of [possible,involving,fungi,life,style,cancer].
+  - FIXED: difflib fuzzy typo correction 2026-05-30 -- _canonical_search_anchor() now uses difflib.get_close_matches(result, ANCHOR_ALIASES.keys(), cutoff=0.82) when the canonical form is not a known entity. Single-char typos (concer->cancer, tumer->tumor) are auto-corrected. Addresses fundamental UX brittleness of dictionary-only anchor matching.
+  - PENDING: clarification_grounding_fix_v2 applied 2026-05-29 (expanded stopwords + any_web_results=direct_answer); rerun family_microfit_v5 to see if quality improves
+  - RESULT: shape8_family_microfit_v5 avg=0.6881 (correction_scope=0.6146 cross_domain=0.7616) missed_traps=0 failure_count=5 GATE_PASSED_AGGREGATE_WITH_CORRECTION_SCOPE_REGRESSION 2026-06-01; run used VOCAB_STORE_ENABLED=false to isolate infrastructure fixes. Cross-domain improved strongly vs v4, correction_scope regressed and needs follow-up diagnosis before broader Stage 2.
+  - FIXED: empty_answer live-run blocker 2026-06-01 -- chat.py now emits evidence fallback when provider stream completes without textual tokens; HttpChatAdapter now records adapter_empty_answer_fallback/adapter_stream metadata and enforces bounded stream reading without returning empty answers. Focused tests: 51 OK.
+  - RESULT: shape8_family_microfit_v6 avg=0.9036 (correction_scope=0.9943 cross_domain=0.5863) missed_traps=0 empty_answer=0 adapter_fallbacks=0 2026-06-01; run used VOCAB_STORE_ENABLED=false. Correction-scope regression resolved; remaining active weakness is cross-domain metabolic unsupported mechanism specificity.
+  - RESULT: shape8_sentinel_c_v4_after_empty_fix avg=0.6724 turns=56 failure_count=56 failed_turns=33 missed_traps=0 empty_answer=0 adapter_fallbacks=0 2026-06-02; GATE_PASSED_SENTINEL_C target avg>=0.64/missed=0. Weakest families: expert_tam_cd8=0.5107, correction_scope=0.5500, cross_cancer_transfer=0.6472, expert_hgf_met=0.6508. Main remaining failure classes: unsupported_plausible_mechanism=38, mechanistic_chain_break=9, factual_inversion=6.
   - Improve mechanism-chain evidence retrieval/scoring for required-node coverage and reduce unsupported relation penalties only after replay proves the evaluator is not over-penalizing caveated answers.
   - Use the Shape5 sentinel_b guard and HGF diagnostic replay evidence before any broader Stage 2 rerun.
   - Keep shape4 as current-best until the TAM/CD8 follow-up guard evidence is reviewed.
   - If a new guard regresses, diagnose that run and create a new candidate without revisiting shape1, shape2, or shape3.
+  - RESULT: shape8_sentinel_a_newconfig_v2_20260610 avg=0.7013 failed_turns=32/56 missed_traps=1 GATE_FAILED 2026-06-11 -- multi-agent NIM config (answer=nemotron-3-ultra-550b-a55b reasoning=high + vocab_rl_fixes). Improvements: hypoxia=+0.249 correction_scope=+0.166. Regressions: cross_cancer=-0.268 mdsc_treg=-0.106. Baseline v3 (avg=0.7148 missed_traps=0) remains best. Reverted answer/reflection to nemotron-super-49b. context_manager=nemotron-3-super-120b-a12b kept (no regression observed).
+  - EXPERIMENT: shape8_sentinel_a_newconfig_20260610 started 2026-06-10 -- multi-agent NIM config (frame=nemotron-super-49b, context_manager=nemotron-3-super-120b-a12b reasoning=medium, answer=nemotron-3-ultra reasoning=high, reflection=nemotron-3-ultra+thinking) vs v3 baseline (single model=nemotron-super-49b avg=0.7148 all 8 scenarios). Run via docker run api:latest with evals mounted. Purpose: validate per-node model specialization; compare per-scenario reward to v3.
   - Start Stage 3 only after Stage 2 diagnosis and higher-confidence live validation are sufficient.

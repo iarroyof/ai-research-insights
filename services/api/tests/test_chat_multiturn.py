@@ -15,7 +15,7 @@ class FakeContextPolicy:
     def __init__(self, tenant: str):
         self.tenant = tenant
 
-    async def plan(self, *, session_id: str, message: str, allow_web_search: bool, confidence_min: float):
+    async def plan(self, *, session_id: str, message: str, allow_web_search: bool, confidence_min: float, evidence_assembly: dict | None = None, gap_spec: dict | None = None):
         history = list(self.history.get(session_id, []))
         return SimpleNamespace(
             turn_index=len(history),

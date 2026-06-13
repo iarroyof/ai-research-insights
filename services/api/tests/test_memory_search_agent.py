@@ -5,6 +5,7 @@ from app.memory.search_agent import (
     _fallback_queries_from_text,
     _feedback_term_report,
     _feedback_terms_from_results,
+    _hit_anchor_coverage,
     _is_off_topic_hit,
     build_auto_context,
     deterministic_query_variants,
@@ -21,6 +22,26 @@ class FakeStore:
 
     async def action_values(self, **kwargs):
         return []
+
+    async def conversation_frame(self, session_id):
+        return {}
+
+
+class FakeFrameStore(FakeStore):
+    async def search_policy_notes(self, **kwargs):
+        return []
+
+    async def conversation_frame(self, session_id):
+        return {
+            "active_terms": [
+                "fungi",
+                "tumorigenesis",
+                "how",
+                "happens",
+                "supplied",
+                "context",
+            ]
+        }
 
 
 async def fake_search(tenant, query, filters, k):
@@ -135,6 +156,34 @@ class FakeNoisyMultilevelSearch:
         ][:k]
 
 
+class FakeFungiMultilevelSearch:
+    def __init__(self):
+        self.calls = []
+
+    async def __call__(self, tenant, level, query, filters, k):
+        self.calls.append({"level": level, "query": query, "filters": filters, "k": k})
+        if level == "title":
+            return [
+                {
+                    "paper_id": "paper-nfkb",
+                    "sent_id": "nfkb",
+                    "title": "NF-kB and inflammation in tumorigenesis",
+                    "text": "NF-kB regulates immune response and inflammation and supports a major role in tumorigenesis.",
+                    "score": 5.0,
+                    "search_level": "title",
+                },
+                {
+                    "paper_id": "paper-fungi",
+                    "sent_id": "fungi",
+                    "title": "Fungi and other microbes in tumorigenesis",
+                    "text": "Other microbes also play essential roles in tumorigenesis, including fungi.",
+                    "score": 4.0,
+                    "search_level": "title",
+                },
+            ][:k]
+        return []
+
+
 class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
     def test_state_key_buckets_do_not_embed_query_terms(self):
         key = search_state_key("Does PD-L1 predict response in non-small cell lung cancer?")
@@ -190,6 +239,81 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("functional synergy", joined)
         self.assertIn("aggressive lung", joined)
         self.assertIn("combination index", frame["avoid_terms"])
+
+    def test_meta_task_words_do_not_dominate_biomedical_search_frame(self):
+        query = (
+            "For a multi-turn evaluation, give the careful biomedical framing for TME-only "
+            "scope control across multi-turn conversation. Use cautious mechanistic language, "
+            "not clinical treatment advice."
+        )
+        frame = _domain_search_frame(query)
+        preferred = " ".join(frame["preferred_queries"]).lower()
+        variants = deterministic_query_variants(query, search_frame=frame, max_variants=4)
+        variant_text = " ".join(item.query.lower() for item in variants)
+
+        self.assertIn("tme", preferred)
+        self.assertIn("tumor microenvironment", preferred)
+        self.assertNotIn("multi turn", preferred)
+        self.assertNotIn("evaluation", preferred)
+        self.assertNotIn("scope control", preferred)
+        self.assertNotIn("treatment", preferred)
+        self.assertNotIn("multi-turn evaluation", variant_text)
+        self.assertNotIn("scope control", variant_text)
+
+    def test_meta_task_hit_feedback_is_rejected_when_biomedical_anchor_missing(self):
+        query = (
+            "For a multi-turn evaluation, give the careful biomedical framing for TME-only "
+            "scope control across multi-turn conversation."
+        )
+        report = _feedback_term_report(
+            [
+                {
+                    "title": "Scope of the problem",
+                    "text": "In turn, the scope of the problem presented is substantial.",
+                }
+            ],
+            anchor_queries=[query, "tme tumor microenvironment"],
+        )
+
+        self.assertEqual(report["accepted_terms"], [])
+        self.assertGreaterEqual(report["rejected_result_count"], 1)
+
+    def test_broad_umbrella_anchor_does_not_bootstrap_incidental_mechanism_feedback(self):
+        report = _feedback_term_report(
+            [
+                {
+                    "title": "Growing evidence suggests TREM-1 involvement in oncogenesis through TME inflammation",
+                    "text": "Growing evidence suggests TREM-1 involvement through cancer-associated inflammation and the tumor microenvironment.",
+                }
+            ],
+            anchor_queries=["TME tumor microenvironment"],
+        )
+
+        accepted = " ".join(report["accepted_terms"]).lower()
+        self.assertNotIn("trem", accepted)
+        self.assertNotIn("involvement", accepted)
+
+    def test_specific_entity_anchor_filters_hit_missing_entity(self):
+        frame = _domain_search_frame("what fungi are described as playing essential roles in tumorigenesis and how it happens")
+
+        nfkb = _hit_anchor_coverage(
+            {
+                "title": "NF-kB and inflammation in tumorigenesis",
+                "text": "NF-kB regulates immune response and inflammation and supports tumorigenesis.",
+            },
+            frame,
+        )
+        fungi = _hit_anchor_coverage(
+            {
+                "title": "Fungi and other microbes in tumorigenesis",
+                "text": "Other microbes also play essential roles in tumorigenesis, including fungi.",
+            },
+            frame,
+        )
+
+        self.assertFalse(nfkb["passes"])
+        self.assertIn("fungi", nfkb["missing_anchors"])
+        self.assertTrue(fungi["passes"])
 
     def test_current_query_prevents_stale_tme_note_from_forcing_fungal_analogy_frame(self):
         frame = _domain_search_frame(
@@ -397,6 +521,92 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan.variants[0].label, "prior_frame")
         self.assertTrue(any(item.label == "prior_frame" for item in plan.variants))
 
+    async def test_search_more_followup_reuses_prior_biomedical_frame(self):
+        plan = await plan_auto_context(
+            message="search more on all your available data sources",
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior search was about fungi and tumorigenesis mechanisms.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "llm_refined",
+                                "query": "fungi tumorigenesis mechanism mycobiome cancer",
+                                "source": "llm",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        joined = " ".join(item.query.lower() for item in plan.variants)
+        self.assertEqual(plan.variants[0].label, "prior_frame")
+        self.assertIn("fungi", joined)
+        self.assertIn("tumorigenesis", joined)
+        self.assertNotIn("supplementary material", joined)
+
+    async def test_unrelated_new_question_does_not_reuse_prior_frame(self):
+        plan = await plan_auto_context(
+            message="what are the body pH and metabolic impairment roles in cancer development?",
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior search was about fungi and tumorigenesis mechanisms.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "llm_refined",
+                                "query": "fungi tumorigenesis mechanism mycobiome cancer",
+                                "source": "llm",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        joined = " ".join(item.query.lower() for item in plan.variants)
+        self.assertFalse(any(item.label == "prior_frame" for item in plan.variants))
+        self.assertIn("metabolic", joined)
+        self.assertNotIn("fungi", joined)
+
+    async def test_build_auto_context_search_more_uses_conversation_frame_when_notes_missing(self):
+        old_llm_refine = settings.memory.auto_context_llm_refine
+        old_k = settings.memory.auto_context_k
+        old_variants = settings.memory.auto_context_query_variants
+        settings.memory.auto_context_llm_refine = False
+        settings.memory.auto_context_k = 4
+        settings.memory.auto_context_query_variants = 4
+        fake_search = FakeFungiMultilevelSearch()
+        try:
+            result = await build_auto_context(
+                tenant="default",
+                session_id="s-frame",
+                message="search more on all your available data sources",
+                store=FakeFrameStore(),
+                selected_context_count=0,
+                confidence_min=0.5,
+                multilevel_search_fn=fake_search,
+            )
+        finally:
+            settings.memory.auto_context_llm_refine = old_llm_refine
+            settings.memory.auto_context_k = old_k
+            settings.memory.auto_context_query_variants = old_variants
+
+        queries = " ".join(call["query"].lower() for call in fake_search.calls)
+        self.assertIn("fungi", queries)
+        self.assertIn("tumorigenesis", queries)
+        self.assertNotIn("supplementary", queries)
+        self.assertTrue(result["snippets"])
+
     async def test_style_rewrite_followup_reuses_prior_biomedical_frame(self):
         plan = await plan_auto_context(
             message="Give me a one-paragraph version for a novice user, but keep the biomedical direction correct.",
@@ -422,6 +632,35 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(plan.variants[0].label, "prior_frame")
         self.assertIn("cancer associated fibroblast", plan.variants[0].query.lower())
+
+    async def test_concise_caveat_followup_reuses_prior_biomedical_frame(self):
+        plan = await plan_auto_context(
+            message="If I ask for a concise answer, what essential caveat must not disappear?",
+            selected_context_count=0,
+            notes=[
+                {
+                    "note": "The prior query was about CAF-associated ECM remodeling and stiffness.",
+                    "search_plan": {
+                        "variants": [
+                            {
+                                "label": "llm_refined",
+                                "query": "CAF ECM remodeling stiffness lung cancer progression",
+                                "source": "llm",
+                            }
+                        ]
+                    },
+                }
+            ],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+
+        self.assertEqual(plan.variants[0].label, "prior_frame")
+        joined = " ".join(item.query.lower() for item in plan.variants)
+        self.assertIn("caf", joined)
+        self.assertIn("ecm", joined)
+        self.assertNotIn("ask concise caveat", joined)
 
     async def test_followup_evidence_puzzle_uses_prior_frame_nodes(self):
         plan = await plan_auto_context(
@@ -624,6 +863,36 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tumorigenesis", queries)
         self.assertIn("mechanism", queries)
 
+    async def test_entity_mechanism_search_rejects_hits_missing_entity_anchor(self):
+        old_llm_refine = settings.memory.auto_context_llm_refine
+        old_k = settings.memory.auto_context_k
+        old_variants = settings.memory.auto_context_query_variants
+        settings.memory.auto_context_llm_refine = False
+        settings.memory.auto_context_k = 4
+        settings.memory.auto_context_query_variants = 4
+        fake_search = FakeFungiMultilevelSearch()
+        try:
+            result = await build_auto_context(
+                tenant="default",
+                session_id="s-fungi",
+                message="what fungi are described as playing essential roles in tumorigenesis and how it happens",
+                store=FakeStore(),
+                selected_context_count=0,
+                confidence_min=0.5,
+                multilevel_search_fn=fake_search,
+            )
+        finally:
+            settings.memory.auto_context_llm_refine = old_llm_refine
+            settings.memory.auto_context_k = old_k
+            settings.memory.auto_context_query_variants = old_variants
+
+        snippets = result["snippets"]
+        plan = result["plan"]
+        self.assertTrue(snippets)
+        self.assertTrue(all("fungi" in (item.get("text") or item.get("title") or "").lower() for item in snippets))
+        self.assertGreaterEqual(plan["level_reports"][0]["anchor_mismatch_result_count"], 1)
+        self.assertNotIn("nf-kb", " ".join(plan["level_reports"][0]["feedback_terms_after"]).lower())
+
     async def test_bibliography_hit_feedback_is_rejected(self):
         report = _feedback_term_report(
             [
@@ -640,6 +909,134 @@ class MemorySearchAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("alnuqaydan", accepted)
         self.assertNotIn("almatroudi", accepted)
         self.assertNotIn("khan", accepted)
+
+    async def test_evidence_assembly_quality_drops_for_meta_task_only_hits(self):
+        query = (
+            "For a multi-turn evaluation, give the careful biomedical framing for TME-only "
+            "scope control across multi-turn conversation."
+        )
+        plan = await plan_auto_context(
+            message=query,
+            selected_context_count=0,
+            notes=[],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+        assembly = _evidence_assembly(
+            message=query,
+            plan=plan,
+            snippets=[
+                {
+                    "paper_id": "paper-scope",
+                    "sent_id": "s1",
+                    "title": "Scope of the problem",
+                    "text": "In turn, the scope of the problem presented is substantial.",
+                }
+            ],
+            level_reports=[
+                {"level": "title", "result_count": 1, "feedback_terms_added": []},
+                {"level": "paper", "result_count": 1, "feedback_terms_added": []},
+                {"level": "sentence", "result_count": 1, "feedback_terms_added": []},
+            ],
+        )
+
+        puzzle = assembly["evidence_puzzle"]
+        self.assertIn("tme", puzzle["candidate_nodes"])
+        self.assertEqual(puzzle["edge_support_status"], "missing")
+        self.assertLessEqual(assembly["assembly_quality"], 0.55)
+
+    async def test_umbrella_only_evidence_puzzle_requests_clarification(self):
+        query = "Give careful biomedical framing for TME-only scope control."
+        plan = await plan_auto_context(
+            message=query,
+            selected_context_count=0,
+            notes=[],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+        assembly = _evidence_assembly(
+            message=query,
+            plan=plan,
+            snippets=[
+                {
+                    "paper_id": "paper-tme",
+                    "sent_id": "s1",
+                    "title": "TME inflammation",
+                    "text": "Growing evidence suggests TREM-1 involvement through cancer-associated inflammation and the tumor microenvironment.",
+                }
+            ],
+            level_reports=[
+                {"level": "title", "result_count": 1, "feedback_terms_added": []},
+            ],
+        )
+
+        self.assertTrue(assembly["clarification_recommended"])
+        self.assertIn("incidental named mechanism", assembly["prompt_context"].lower())
+
+    async def test_mechanism_question_with_generic_relation_is_partial_not_supported(self):
+        query = "what fungi are described as playing essential roles in tumorigenesis and how it happens"
+        plan = await plan_auto_context(
+            message=query,
+            selected_context_count=0,
+            notes=[],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+        assembly = _evidence_assembly(
+            message=query,
+            plan=plan,
+            snippets=[
+                {
+                    "paper_id": "paper-fungi",
+                    "sent_id": "s1",
+                    "title": "Other microbes in tumorigenesis",
+                    "text": "Other microbes also play essential roles in tumorigenesis, including fungi, viruses, and bacteriophages.",
+                    "relation": "play roles in",
+                }
+            ],
+            level_reports=[
+                {"level": "sentence", "result_count": 1, "feedback_terms_added": ["fungi", "tumorigenesis"]},
+            ],
+        )
+
+        self.assertEqual(assembly["evidence_puzzle"]["edge_support_status"], "partial")
+
+    async def test_general_to_particular_process_words_do_not_become_missing_nodes(self):
+        query = "I am interested in the general-to-particular process of how cancer starts and develops"
+        plan = await plan_auto_context(
+            message=query,
+            selected_context_count=0,
+            notes=[],
+            action_value_hints=[],
+            max_variants=4,
+            allow_llm_refine=False,
+        )
+        assembly = _evidence_assembly(
+            message=query,
+            plan=plan,
+            snippets=[
+                {
+                    "paper_id": "paper-cancer",
+                    "sent_id": "s1",
+                    "title": "Cancer initiation and progression",
+                    "text": "Cancer initiation and progression involve genomic alterations, clonal expansion, immune evasion, and tissue microenvironment changes.",
+                }
+            ],
+            level_reports=[
+                {"level": "sentence", "result_count": 1, "feedback_terms_added": ["cancer", "progression"]},
+            ],
+        )
+
+        puzzle = assembly["evidence_puzzle"]
+        nodes = set(puzzle["candidate_nodes"])
+        self.assertIn("cancer", nodes)
+        self.assertNotIn("interested", nodes)
+        self.assertNotIn("general to particular", nodes)
+        self.assertNotIn("general-to-particular", nodes)
+        self.assertNotIn("particular", nodes)
 
 
 if __name__ == "__main__":

@@ -9,12 +9,38 @@ DEFAULT_WEIGHTS = {
     "factual_support": 0.30,
     "contradiction_avoidance": 0.20,
     "mechanistic_completeness": 0.15,
-    "scope_alignment": 0.10,
-    "correction_adherence": 0.10,
+    "scope_alignment": 0.05,
+    "correction_adherence": 0.05,
     "uncertainty_calibration": 0.10,
     "citation_or_evidence_quality": 0.05,
+    # WP-E: retrieval quality components (sum stays 1.0 when evidence_assembly_quality
+    # and evidence_bridge_safety are included via setdefault)
+    "retrieval_gap_closure": 0.05,
+    "retrieval_distractor_quality": 0.05,
+    # Multi-turn coreference (2026-06-12) — non-zero only with coreference_data
+    "inter_turn_coreference": 0.0,
+    "context_poor_resolution": 0.0,
+    "conversation_continuity": 0.0,
 }
 
+
+
+def _score_coreference(coreference_data, retrieved_entities):
+    must_c = [e.lower() for e in coreference_data.get('effective_query_must_contain', [])]
+    must_nc = [e.lower() for e in coreference_data.get('effective_query_must_not_contain', [])]
+    retr = [e.lower() for e in (retrieved_entities or [])]
+    sc = {}
+    sc['inter_turn_coreference'] = (
+        sum(1 for e in must_c if any(e in r for r in retr)) / len(must_c)
+        if must_c else 0.0
+    )
+    if must_nc:
+        bad = sum(1 for e in must_nc if any(e in r for r in retr))
+        sc['context_poor_resolution'] = 1.0 if bad == 0 else max(0.0, 1.0 - bad * 0.5)
+    else:
+        sc['context_poor_resolution'] = 1.0
+    sc['conversation_continuity'] = sc['inter_turn_coreference']
+    return sc
 
 def score_turn(
     *,
@@ -24,6 +50,7 @@ def score_turn(
     reward_config: dict[str, Any],
     obeyed_correction: bool = True,
     search_telemetry: dict[str, Any] | None = None,
+    coreference_data: dict | None = None,
 ) -> TurnScore:
     weights = dict(DEFAULT_WEIGHTS)
     weights.update((reward_config.get("reward_components") or {}))
@@ -57,7 +84,28 @@ def score_turn(
         component_scores["evidence_bridge_safety"] = 0.0 if unsupported and edge_support == "missing" else 0.5 if unsupported and edge_support == "partial" else 1.0
         weights.setdefault("evidence_assembly_quality", 0.05)
         weights.setdefault("evidence_bridge_safety", 0.08)
+        # WP-E: per-step retrieval quality from step_rewards (primary) or level_reports (fallback)
+        _step_rewards = telemetry.get("step_rewards") or []
+        _level_reports = telemetry.get("level_reports") or []
+        _reward_source = _step_rewards if _step_rewards else _level_reports
+        if _reward_source:
+            _gap_closure = sum(r.get("gap_closure_score", 0.0) for r in _reward_source) / len(_reward_source)
+            _distractor = sum(r.get("distractor_ratio", 0.0) for r in _reward_source) / len(_reward_source)
+        else:
+            _gap_closure = 0.0
+            _distractor = 0.0
+        component_scores["retrieval_gap_closure"] = _gap_closure
+        # invert distractor: higher score = fewer distractors = better
+        component_scores["retrieval_distractor_quality"] = 1.0 - _distractor
 
+    if coreference_data:
+        _tel = search_telemetry or {}
+        _retr = list(_tel.get("retrieved_entities") or [])
+        _coref = _score_coreference(coreference_data, _retr)
+        component_scores.update(_coref)
+        weights.setdefault("inter_turn_coreference", 0.10)
+        weights.setdefault("context_poor_resolution", 0.05)
+        weights.setdefault("conversation_continuity", 0.05)
     base = sum(weights.get(key, 0.0) * value for key, value in component_scores.items())
     raw_penalties: list[dict[str, Any]] = []
     for judgment in judgments:

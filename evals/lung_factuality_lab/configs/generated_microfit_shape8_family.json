@@ -1,0 +1,7 @@
+{
+  "batch_id": "lung_factuality_microfit_shape8_family_v2",
+  "scenarios": [
+    "correction_scope_tme_only_001__gen_004",
+    "cross_domain_metabolic_pathway_001"
+  ]
+}

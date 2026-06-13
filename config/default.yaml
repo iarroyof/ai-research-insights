@@ -74,6 +74,15 @@ llm:
       provider: nvidia
       model: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
       max_tokens: 512
+    # Tier-1 intent router (P-7): small fast NIM, classification only.
+    # MNLI fallback (facebook/bart-large-mnli via app.services.zero_shot) is
+    # env-driven (ZERO_SHOT_*) and kicks in when this NIM is unreachable.
+    router:
+      provider: nvidia
+      model: "nvidia/nemotron-3-nano-30b-a3b"
+      # Nemotron models spend budget on reasoning before the final content; a
+      # tiny cap (e.g. 40) yields EMPTY content. 256 reliably returns the JSON.
+      max_tokens: 256
 
 memory:
   enabled: true

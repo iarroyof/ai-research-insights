@@ -125,3 +125,13 @@ Extension guide:
          tier-2 (120b, reasoning=medium): genuinely ambiguous multi-turn reference
        Expected savings: >60% of resolve_message_intent() calls never reach 120b.
        See P-3 for reward tracking once correct intent resolution is confirmed.
+
+## P-7 IMPLEMENTED (2026-06-13): Tier-1 zero-shot intent router
+
+Inserted between tier-0 lexical rules (_is_context_poor) and tier-2 120b (resolve_message_intent) in plan_auto_context.
+
+- Backends: NIM primary (nvidia/nemotron-3-nano-30b-a3b via agent_models.router) + HF MNLI fallback (facebook/bart-large-mnli via app.services.zero_shot.score_labels, wrapped in asyncio.to_thread). Both validated against real providers.
+- Behavior: high-confidence prior_context (conf >= ROUTER_CONF_THRESHOLD=0.6) short-circuits the 120b (no query rewrite needed); new_query/augment_prior and low-confidence escalate to the 120b for the effective_query rewrite.
+- Files: config/default.yaml (router agent_models, max_tokens=256 — Nemotron needs reasoning headroom), prompts/agent_prompts.py (router_system_prompt + ROUTER_INTENT_HYPOTHESES + registry), memory/intent_router.py (NEW), memory/search_agent.py (cascade integration + import), tests/test_intent_router.py (NEW, 12 tests).
+- Validation: 12/12 unit, 36/36 search_agent regression, real NVIDIA nano + HF MNLI smoke (the second one->prior_context 0.96 nim; EGFR question->new_query 0.96 nim).
+- Note: replaces the naive lexical _is_followup_reference gate for context-poor routing; _is_followup_reference still used elsewhere (P-1/anchor robustness remains future work).

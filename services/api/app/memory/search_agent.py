@@ -16,6 +16,7 @@ from app.prompts.agent_prompts import (
     intent_resolution_system_prompt,
     ner_grounding_system_prompt,
 )
+from app.memory.intent_router import ROUTER_CONF_THRESHOLD, classify_intent_zeroshot
 from app.memory.rewards import distractor_ratio, gap_closure_score, important_terms, query_novelty
 from app.search.hybrid import hybrid_search_multilevel, hybrid_search_sentences
 # Modules 2/3: vocabulary store (feature-flagged; no-op when VOCAB_STORE_ENABLED!=true)
@@ -1021,15 +1022,37 @@ async def plan_auto_context(
     _resolved: dict[str, str] | None = None
     _eff_msg = message
     if _context_poor and allow_llm_refine:
-        _resolved = await resolve_message_intent(
-            message,
-            notes=notes,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
-            llm_api_format=llm_api_format,
-        )
-        if _resolved and _resolved.get("intent") in {"new_query", "augment_prior"} and _resolved.get("effective_query"):
-            _eff_msg = _resolved["effective_query"]
+        # ── Tier-1 zero-shot intent router (P-7) ───────────────────────────
+        # Cheap classifier (small NIM primary, HF MNLI fallback) decides intent
+        # before the expensive 120b. A high-confidence prior_context needs NO
+        # query rewrite — reuse the prior frame and skip the 120b entirely.
+        # new_query/augment_prior (which need an effective_query rewrite) and
+        # low-confidence cases escalate to tier-2 (resolve_message_intent).
+        _router = await classify_intent_zeroshot(message, notes)
+        if (
+            _router
+            and _router.get("intent") == "prior_context"
+            and float(_router.get("confidence", 0.0)) >= ROUTER_CONF_THRESHOLD
+        ):
+            _resolved = {
+                "intent": "prior_context",
+                "effective_query": "",
+                "explanation": (
+                    f"tier1-router({_router.get('source')}) "
+                    f"conf={float(_router.get('confidence', 0.0)):.2f}"
+                ),
+            }
+        else:
+            # ── Tier-2: 120b context_manager (rewrite / genuine ambiguity) ──
+            _resolved = await resolve_message_intent(
+                message,
+                notes=notes,
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                llm_api_format=llm_api_format,
+            )
+            if _resolved and _resolved.get("intent") in {"new_query", "augment_prior"} and _resolved.get("effective_query"):
+                _eff_msg = _resolved["effective_query"]
 
     base = deterministic_query_variants(_eff_msg, strategy=strategy, max_variants=max_variants, search_frame=search_frame)
     prior: list[SearchQueryVariant] = []

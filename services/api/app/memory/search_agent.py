@@ -54,6 +54,11 @@ GROUNDING_TERMS_PER_SNIPPET = _env_int("GROUNDING_TERMS_PER_SNIPPET", 12)
 GROUNDING_CTX_ENTITIES_MAX = _env_int("GROUNDING_CTX_ENTITIES_MAX", 40)
 GROUNDING_CTX_ENTITIES_PROMPT_MAX = _env_int("GROUNDING_CTX_ENTITIES_PROMPT_MAX", 30)
 GROUNDING_MESSAGE_CHARS = _env_int("GROUNDING_MESSAGE_CHARS", 400)
+# G6: per-call LLM output budgets (override the agent_models default for these
+# specific call-types whose output is short/bounded).
+FRAME_REFINE_MAX_TOKENS = _env_int("FRAME_REFINE_MAX_TOKENS", 900)
+INTENT_RESOLVE_MAX_TOKENS = _env_int("INTENT_RESOLVE_MAX_TOKENS", 250)
+GROUNDING_MAX_TOKENS = _env_int("GROUNDING_MAX_TOKENS", 500)
 
 
 
@@ -926,7 +931,7 @@ async def llm_refine_variants(
         provider=llm_provider,
         model=llm_model,
         api_format=llm_api_format,
-        max_tokens=900,
+        max_tokens=FRAME_REFINE_MAX_TOKENS,
         agent="frame",
     )
     data = _extract_json_object(text) or {}
@@ -1010,7 +1015,7 @@ async def resolve_message_intent(
             provider=llm_provider,
             model=llm_model,
             api_format=llm_api_format,
-            max_tokens=250,
+            max_tokens=INTENT_RESOLVE_MAX_TOKENS,
             agent="context_manager",
         )
         _data = _extract_json_object(_text)
@@ -1790,7 +1795,7 @@ async def llm_ground_entities(
             provider=llm_provider,
             model=llm_model,
             api_format=llm_api_format,
-            max_tokens=500,
+            max_tokens=GROUNDING_MAX_TOKENS,
             agent="ner_grounding",
         )
         data = _extract_json_object(raw) or {}

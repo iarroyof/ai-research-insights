@@ -230,9 +230,11 @@ home already exists and the literal should just reference it; ⬜ = needs a new 
   G5 Memory-item fetch/render counts
      reflections[:3], episodic_summaries(3), latest_traces(3), ideas[:8], policy_notes(4),
      landmarks. → MemoryFetchCfg (some live in MemoryCfg; unify).
-  G6 Provider budgets & timeouts
-     inline max_tokens=900/700/500/250/160 (some now in agent_models ✅; _llm_* inline ones not),
-     timeout=10/12/16/20/30/60/120, max_nli_pairs_per_claim=8, batch_size. → ProviderCfg / agent_models.
+  G6 Provider budgets & timeouts  ✅ PARTIAL DONE 2026-06-14 (agent-output budgets)
+     env constants: search_agent FRAME_REFINE_MAX_TOKENS(900)/INTENT_RESOLVE_MAX_TOKENS(250)/
+     GROUNDING_MAX_TOKENS(500); policy EXTERNAL_QUERY_MAX_TOKENS(700)/REFLECT_MAX_TOKENS(160)/
+     MAX_NLI_PAIRS_PER_CLAIM(8). REMAINING: low-level httpx timeout=10/12/16/20/30/60/120 in
+     web_search/os_client/store (network timeouts; lower priority) — fold into a later pass.
   G7 Triplet/KG caps
      triplets/filters [:20]/[:100], neo4j sync [:1000], batch_size=1000, confidence_min. → TripletCfg.
   ✅ Already done (the model for the rest): router (ROUTER_*), nli (NLI_LLM_*), premise (PREMISE_*).

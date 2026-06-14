@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -40,6 +41,20 @@ try:
     from app.triplets.search import search_triplets
 except Exception:
     search_triplets = None
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+# ── Configurable caps (no hardcoding — ARCHITECTURE.md rule 13) ──────────────
+# G6: per-call LLM output budgets + claim-verification fan-out.
+EXTERNAL_QUERY_MAX_TOKENS = _env_int("EXTERNAL_QUERY_MAX_TOKENS", 700)   # _llm_external_query_variants
+REFLECT_MAX_TOKENS = _env_int("REFLECT_MAX_TOKENS", 160)                 # _reflect
+MAX_NLI_PAIRS_PER_CLAIM = _env_int("MAX_NLI_PAIRS_PER_CLAIM", 8)         # assess_claim_support fan-out
 
 
 @dataclass
@@ -353,7 +368,7 @@ async def _llm_external_query_variants(query: str, base_variants: list[str], lim
     ]
     text = await LLMClient().chat_once(
         messages,
-        max_tokens=700,
+        max_tokens=EXTERNAL_QUERY_MAX_TOKENS,
         agent="context_manager",
     )
     data = _extract_json_object(text) or {}
@@ -1099,7 +1114,7 @@ class ContextPolicy:
         claim_support = await assess_claim_support(
             claims,
             evidence_candidates,
-            max_nli_pairs_per_claim=8,
+            max_nli_pairs_per_claim=MAX_NLI_PAIRS_PER_CLAIM,
         )
         answer_id = f"answer_{session_id}_{turn_index + 1}"
         evidence_table = build_evidence_table(
@@ -1301,7 +1316,7 @@ class ContextPolicy:
         try:
             text = await LLMClient().chat_once(
                 messages,
-                max_tokens=160,
+                max_tokens=REFLECT_MAX_TOKENS,
                 agent="reflection",
             )
             return " ".join(text.split())[:700]

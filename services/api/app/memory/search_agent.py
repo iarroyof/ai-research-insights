@@ -16,11 +16,7 @@ from app.prompts.agent_prompts import (
     intent_resolution_system_prompt,
     ner_grounding_system_prompt,
 )
-from app.memory.intent_router import (
-    ROUTER_CONF_THRESHOLD,
-    classify_intent_zeroshot,
-    prior_turn_clarification_marker,
-)
+from app.memory.intent_router import ROUTER_CONF_THRESHOLD, classify_intent_zeroshot
 from app.memory.rewards import distractor_ratio, gap_closure_score, important_terms, query_novelty
 from app.search.hybrid import hybrid_search_multilevel, hybrid_search_sentences
 # Modules 2/3: vocabulary store (feature-flagged; no-op when VOCAB_STORE_ENABLED!=true)
@@ -1029,52 +1025,42 @@ async def plan_auto_context(
     _router: dict[str, Any] | None = None
     _intent_tier = "none"  # P-3: which tier resolved a context-poor message
     if _context_poor and allow_llm_refine:
-        # ── Tier-0.5: deterministic clarification-marker short-circuit (P-8) ──
-        # A context-poor reply following a clarification turn (CLARIFICATION_OPENING_MARKER,
-        # code-emitted at the answer head) is answering it → prior_context. The marker is
-        # exact, so this needs NO classifier/120b call. The classifier is reserved for
-        # no-marker context-poor replies (follow-ups to normal answers: coreference,
-        # "continue", "yes"), which are the majority and genuinely need classification.
-        if prior_turn_clarification_marker(notes):
-            _intent_tier = "clarification_marker"
+        # ── Tier-1 zero-shot intent router (P-7) ───────────────────────────
+        # Cheap classifier (small NIM primary, HF MNLI fallback) decides intent
+        # before the expensive 120b. A high-confidence prior_context needs NO
+        # query rewrite — reuse the prior frame and skip the 120b entirely.
+        # new_query/augment_prior (which need an effective_query rewrite) and
+        # low-confidence cases escalate to tier-2 (resolve_message_intent).
+        # The prior-turn clarification marker, when present, is injected by
+        # classify_intent_zeroshot as a premise CUE — it BIASES this classifier,
+        # it does not replace user-message intent prediction.
+        _router = await classify_intent_zeroshot(message, notes)
+        if (
+            _router
+            and _router.get("intent") == "prior_context"
+            and float(_router.get("confidence", 0.0)) >= ROUTER_CONF_THRESHOLD
+        ):
+            _intent_tier = "tier1_router"
             _resolved = {
                 "intent": "prior_context",
                 "effective_query": "",
-                "explanation": "clarification-marker (deterministic; no classifier)",
+                "explanation": (
+                    f"tier1-router({_router.get('source')}) "
+                    f"conf={float(_router.get('confidence', 0.0)):.2f}"
+                ),
             }
         else:
-            # ── Tier-1 zero-shot intent router (P-7) ───────────────────────
-            # Cheap classifier (small NIM primary, HF MNLI fallback) decides intent
-            # before the expensive 120b. High-confidence prior_context needs NO query
-            # rewrite — reuse the prior frame and skip the 120b. new_query/augment_prior
-            # (which need a rewrite) and low-confidence cases escalate to tier-2.
-            _router = await classify_intent_zeroshot(message, notes)
-            if (
-                _router
-                and _router.get("intent") == "prior_context"
-                and float(_router.get("confidence", 0.0)) >= ROUTER_CONF_THRESHOLD
-            ):
-                _intent_tier = "tier1_router"
-                _resolved = {
-                    "intent": "prior_context",
-                    "effective_query": "",
-                    "explanation": (
-                        f"tier1-router({_router.get('source')}) "
-                        f"conf={float(_router.get('confidence', 0.0)):.2f}"
-                    ),
-                }
-            else:
-                # ── Tier-2: 120b context_manager (rewrite / genuine ambiguity) ──
-                _resolved = await resolve_message_intent(
-                    message,
-                    notes=notes,
-                    llm_provider=llm_provider,
-                    llm_model=llm_model,
-                    llm_api_format=llm_api_format,
-                )
-                _intent_tier = "tier2_120b" if _resolved else "heuristic"
-                if _resolved and _resolved.get("intent") in {"new_query", "augment_prior"} and _resolved.get("effective_query"):
-                    _eff_msg = _resolved["effective_query"]
+            # ── Tier-2: 120b context_manager (rewrite / genuine ambiguity) ──
+            _resolved = await resolve_message_intent(
+                message,
+                notes=notes,
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                llm_api_format=llm_api_format,
+            )
+            _intent_tier = "tier2_120b" if _resolved else "heuristic"
+            if _resolved and _resolved.get("intent") in {"new_query", "augment_prior"} and _resolved.get("effective_query"):
+                _eff_msg = _resolved["effective_query"]
 
     base = deterministic_query_variants(_eff_msg, strategy=strategy, max_variants=max_variants, search_frame=search_frame)
     prior: list[SearchQueryVariant] = []

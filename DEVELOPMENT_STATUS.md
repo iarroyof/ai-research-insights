@@ -186,14 +186,13 @@ HEAD truncation (or a count cap) before a downstream consumer sees it.
   AND the 120b resolve_message_intent (same recent_turns) silently missed them, diverging
   from the frontend (which parses the full answer for checkboxes). Fix: deterministic head
   marker CLARIFICATION_OPENING_MARKER (survives [:300]) + clarification contract now opens
-  with the marker and puts lettered options last. 19/19 router tests.
-  REFINEMENT (2026-06-14): marker strengthened to a bracketed sentinel "[Clarification
-  needed]" (distinctive, exact, code-emitted) and PROMOTED to a deterministic tier-0.5 in
-  plan_auto_context: context-poor + marker -> prior_context with NO classifier/120b
-  (prior_turn_clarification_marker). The classifier is NOT removed — it's reserved for
-  no-marker context-poor replies (coreference/"continue"/"yes" after a normal answer), the
-  majority, since clarification answer-mode is a minority of turns. _prior_turn_is_clarification
-  (marker OR lettered) stays as the softer tier-1 premise hint.
+  with the marker and puts lettered options last. 18/18 router tests.
+  Marker strengthened (2026-06-14) to a bracketed, code-emitted sentinel "[Clarification
+  needed]" (distinctive, regex-safe). It stays a CUE: _prior_turn_is_clarification detects
+  it and _premise injects an options hint that BIASES the tier-1 classifier — it does NOT
+  decide user-message intent. (A deterministic tier-0.5 short-circuit was prototyped and
+  REVERTED as out-of-scope: it added unrequested logic to the user-intent cascade; the
+  marker is only a cue, per design.)
 - Secondary, LOW risk, EASY if needed (not done — flagged):
   * ner_grounding ctx_entities[:40]→[:30] (search_agent ~1726/1745): silent COUNT cap; a key
     entity ranked >40 is dropped. Easy: sort query/confirmed entities to the front before the cap.
@@ -203,6 +202,39 @@ HEAD truncation (or a count cap) before a downstream consumer sees it.
   * Answer-agent render caps (policy.py text[:900]/[:700]/[:500] etc.): per-item head-trunc for
     the answer prompt. Lower impact (49b large context, synthesizes). Could append "…(truncated)"
     so the model knows. Not a silent-routing bug.
+
+## P-9: Hardcoded caps/limits audit — grouped by functional knob type (2026-06-14)
+
+Rule 13 is NOT yet satisfied for the legacy surface: many array/char caps are inline literals.
+Full scan of services/api/app grouped by the config knob they SHOULD become. (✅ = a config
+home already exists and the literal should just reference it; ⬜ = needs a new named field.)
+
+  G1 Conversation-window sizes (how much history fed downstream)
+     recent_messages(3,4000) + recent_turns[-6:]/[:6]/[:300] (search_agent ~1829/949/945),
+     working_buffer K=8 ✅(memory.working_buffer_turns). → MemoryWindowCfg{turns_fetch, per_turn_chars}.
+  G2 Per-item text-truncation char budgets (prompt rendering)
+     store.py [:1000]/[:700]/[:500]/[:260]/[:180]/[:160]; policy render [:900]/[:700]/[:520]/[:280];
+     chat [:360]/[:300]/[:497]/[:217]; agent_prompts [:300]/[:180]; nli premise[:1200]/hyp[:500] ✅(env).
+     → RenderTruncationCfg{summary_chars, turn_chars, snippet_chars, claim_chars, sentence_chars}.
+  G3 Retrieval result/candidate counts (k / limits)
+     bm25 k=50 ✅(os.bm25_k); memory_k/triplet_k/web_k/auto_context_k ✅; inline limit=4/6/8/10/12/16/18/24,
+     pmcids[:5], external_queries[:4/6]. → RetrievalCfg (exists; call-site literals must reference it).
+  G4 Entity/term/anchor list caps
+     ctx_entities[:40]→[:30] (ner), active_terms[:8/12], anchors[:10/12], synonyms[:4], alias[:3],
+     missing_entities[:4], task_terms[:16/18], normalized[:8]. → VocabGroundingCfg + prioritize key
+     entities to front before the cap (the P-8 ner item).
+  G5 Memory-item fetch/render counts
+     reflections[:3], episodic_summaries(3), latest_traces(3), ideas[:8], policy_notes(4),
+     landmarks. → MemoryFetchCfg (some live in MemoryCfg; unify).
+  G6 Provider budgets & timeouts
+     inline max_tokens=900/700/500/250/160 (some now in agent_models ✅; _llm_* inline ones not),
+     timeout=10/12/16/20/30/60/120, max_nli_pairs_per_claim=8, batch_size. → ProviderCfg / agent_models.
+  G7 Triplet/KG caps
+     triplets/filters [:20]/[:100], neo4j sync [:1000], batch_size=1000, confidence_min. → TripletCfg.
+  ✅ Already done (the model for the rest): router (ROUTER_*), nli (NLI_LLM_*), premise (PREMISE_*).
+
+  Suggested order (value×ease): G1 + G4 (directly affect router/intent quality, small), then G6
+  (cost), then G2/G3/G5/G7 (broad, mechanical). NOT yet implemented — this is the plan.
 
 ## Engineering Standards (apply to ALL agents/sessions)
 

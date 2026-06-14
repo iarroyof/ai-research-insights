@@ -120,16 +120,6 @@ def _recent_turn_text(notes: list[dict[str, Any]] | None) -> str:
     return ""
 
 
-def prior_turn_clarification_marker(notes: list[dict[str, Any]] | None) -> bool:
-    """True iff the most recent turn carries the code-emitted CLARIFICATION_OPENING_MARKER.
-
-    PRECISE (marker only, not the fuzzier lettered-options heuristic): the marker is
-    prepended deterministically by chat._opening_clarification_prefix, so an exact match
-    is unambiguous. plan_auto_context uses this for a DETERMINISTIC tier-0.5 short-circuit
-    — a context-poor reply after a clarification routes prior_context with no classifier."""
-    return CLARIFICATION_OPENING_MARKER.lower() in _recent_turn_text(notes).lower()
-
-
 def _prior_turn_is_clarification(notes: list[dict[str, Any]] | None) -> bool:
     """True when the most recent assistant turn asked for clarification.
 

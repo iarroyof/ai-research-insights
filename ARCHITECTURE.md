@@ -167,13 +167,13 @@ Per-agent routing: _agent_provider_config(agent_name) reads
         -> resolve as prior_context, SKIP the 120b (no rewrite needed)
     new_query/augment_prior OR low confidence OR both backends fail
         -> escalate to resolve_message_intent (120b) for the effective_query rewrite
-  Answer-derived signal: CLARIFICATION_OPENING_MARKER = "[Clarification needed]" — a
-    bracketed sentinel prepended DETERMINISTICALLY (by code, not the model) at the answer
-    HEAD by chat._opening_clarification_prefix, TRUNCATION-PROOF. Two consumers:
-    (1) prior_turn_clarification_marker() — exact marker match → drives the deterministic
-        tier-0.5 route (prior_context, no classifier). PRECISE.
-    (2) _prior_turn_is_clarification() — marker OR lettered options → softer premise hint
-        for the tier-1 classifier; lettered check mirrors the frontend extract_clarification_options.
+  Answer-derived signal (CUE only — does NOT decide user intent): CLARIFICATION_OPENING_MARKER
+    = "[Clarification needed]" is a bracketed sentinel prepended DETERMINISTICALLY (by code,
+    not the model) at the answer HEAD by chat._opening_clarification_prefix, TRUNCATION-PROOF.
+    _prior_turn_is_clarification() detects it (marker OR lettered options; lettered check
+    mirrors the frontend extract_clarification_options) and _premise() injects an options
+    HINT into the classifier premise. It BIASES the tier-1 classifier toward prior_context;
+    the classifier still predicts the user-message intent. (No deterministic override.)
     ⚠️ TRUNCATION FAILURE MODE (fixed 2026-06-14): clarification options live at the
     END of the answer, but recent_turns are head-truncated to [:300] in
     build_auto_context, so the token-limited router (and the 120b resolve_message_intent,
@@ -256,18 +256,13 @@ biomedical anchors -> BM25 gets nonsense queries -> retrieval broken.
          -> format as [Turn N] role: content[:300]
          -> inject as recent_turns_note into notes list
 
-  plan_auto_context() cascade (P-7 / P-8):
-    tier-0.5: prior_turn_clarification_marker(notes) [deterministic, no LLM] — if the
-              prior turn carries CLARIFICATION_OPENING_MARKER, a context-poor reply is
-              answering it -> prior_context. No classifier/120b. (P-8)
-    tier-1:   classify_intent_zeroshot() [router agent, nano NIM + MNLI fallback] — for
-              NO-marker context-poor replies (coreference, "continue", "yes" after a
-              normal answer). high-confidence prior_context -> resolve here, skip the 120b
-    tier-2:   resolve_message_intent() [context_manager, 120b, med] only when tier-1 says
-              new_query/augment_prior or is unsure
-    Why keep the classifier: the marker only appears in clarification answer-mode (a
-    minority of turns); most context-poor replies follow a normal answer (no marker) and
-    still need classification.
+  plan_auto_context() cascade (P-7):
+    tier-1: classify_intent_zeroshot() [router agent, nano NIM + MNLI fallback]
+            high-confidence prior_context -> resolve here, skip the 120b. The prior-turn
+            clarification marker (P-8) is injected as a premise CUE that BIASES this
+            classifier — it is NOT a deterministic override of intent prediction.
+    tier-2: resolve_message_intent() [context_manager, 120b, med] only when tier-1 says
+            new_query/augment_prior or is unsure
     Reads from notes: active_terms, summary, recent_queries, recent_turns
     Returns: {intent, effective_query} -> sets _eff_msg
 

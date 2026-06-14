@@ -21,7 +21,9 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
     environment:
       - APP_CONFIG=/app/config/default.yaml
-      - PYTHONPATH=/app
+      # /lab added so the eval lab (mounted at /lab/evals, NOT nested under the
+      # /app bind mount) is importable as the `evals` package without mount masking.
+      - PYTHONPATH=/app:/lab
       - API_URL=http://api:8080
       - API_KEY=${API_KEY}
 
@@ -64,9 +66,10 @@ services:
     volumes:
       - ./services/api:/app
       - ./config:/app/config:ro
-      # Eval lab mounted read-write so run_batch/run_single can execute inside the
-      # api container (deps already present) and persist runs/ to the host.
-      - ./evals:/app/evals
+      # Eval lab mounted read-write at /lab/evals (NOT under the /app mount — a
+      # nested /app/evals mount gets masked by the /app bind mount). Importable as
+      # the `evals` package via PYTHONPATH=/app:/lab. Run with -w /lab.
+      - ./evals:/lab/evals
     depends_on:
       - postgres
       - opensearch

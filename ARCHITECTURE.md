@@ -418,16 +418,19 @@ Passed: build_auto_context() -> chat.py -> policy.plan() via gap_spec= param.
   ### Running the eval lab (2026-06-13)
   Runs INSIDE the api container (deps yaml/pydantic/urllib already present; NO httpx
   needed, NO rebuild). Eval tree is bind-mounted via docker-compose api volume
-  `./evals:/app/evals` (added 2026-06-13). No curl/ps/pytest/jq in the container.
-    docker exec -d -w /app ai-research-insights-api-1 sh -c \
+  `./evals:/lab/evals` with `PYTHONPATH=/app:/lab`. ⚠️ It is mounted at /lab/evals, NOT
+  /app/evals: a mount nested under the /app bind mount gets MASKED (and deleting its
+  backing dir from another container breaks it). No curl/ps/pytest/jq in the container.
+    docker exec -d -w /lab ai-research-insights-api-1 sh -c \
       'python -m evals.lung_factuality_lab.src.run_batch \
          --config evals/lung_factuality_lab/configs/generated_sentinel_a.yaml \
          --assistant http --endpoint http://localhost:8080/chat/ \
          --api-key "$API_KEY" --tenant-id eval-lab \
-         --out evals/lung_factuality_lab/runs/<name> --request-timeout 300 > /app/eval.log 2>&1'
+         --out evals/lung_factuality_lab/runs/<name> --request-timeout 300 > /tmp/eval.log 2>&1'
   Internal uvicorn port=8080; chat route POST /chat/; HttpChatAdapter (urllib) needs the
   FULL chat URL; API_KEY is in the container env. ~12 min/scenario (real NVIDIA + HF NLI).
   Completion = recommendations.json at run root. Gate = failure_summary.missed_injected_traps==0.
+  Output persists to host ./evals/.../runs/ via the mount (no docker cp needed).
 
   Last run shape8_sentinel_a_p7p1p3 (P-7+P-1+P-3 config, 2026-06-13): 8-scenario avg
   0.7247 (> 0.7148 baseline), missed_injected_traps=0 → sentinel_a RE-CLEARED. Per-scenario:

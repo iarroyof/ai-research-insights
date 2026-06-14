@@ -415,6 +415,27 @@ Passed: build_auto_context() -> chat.py -> policy.plan() via gap_spec= param.
     context_poor_resolution  weight 0.05
     conversation_continuity  weight 0.05
 
+  ### Running the eval lab (2026-06-13)
+  Runs INSIDE the api container (deps yaml/pydantic/urllib already present; NO httpx
+  needed, NO rebuild). Eval tree is bind-mounted via docker-compose api volume
+  `./evals:/app/evals` (added 2026-06-13). No curl/ps/pytest/jq in the container.
+    docker exec -d -w /app ai-research-insights-api-1 sh -c \
+      'python -m evals.lung_factuality_lab.src.run_batch \
+         --config evals/lung_factuality_lab/configs/generated_sentinel_a.yaml \
+         --assistant http --endpoint http://localhost:8080/chat/ \
+         --api-key "$API_KEY" --tenant-id eval-lab \
+         --out evals/lung_factuality_lab/runs/<name> --request-timeout 300 > /app/eval.log 2>&1'
+  Internal uvicorn port=8080; chat route POST /chat/; HttpChatAdapter (urllib) needs the
+  FULL chat URL; API_KEY is in the container env. ~12 min/scenario (real NVIDIA + HF NLI).
+  Completion = recommendations.json at run root. Gate = failure_summary.missed_injected_traps==0.
+
+  Last run shape8_sentinel_a_p7p1p3 (P-7+P-1+P-3 config, 2026-06-13): 8-scenario avg
+  0.7247 (> 0.7148 baseline), missed_injected_traps=0 → sentinel_a RE-CLEARED. Per-scenario:
+  caf_ecm 0.6045, citation_drift 0.6478, correction_scope 0.675, cross_cancer 0.8175,
+  expert_hgf_met 0.8416, expert_tam_cd8 0.8048, hypoxia 0.6853, mdsc_treg 0.7212. The
+  scenarios that regressed in the reverted ultra-550b experiment (cross_cancer, mdsc_treg)
+  are now healthy.
+
 ---
 
 ## 11. Critical Engineering Rules

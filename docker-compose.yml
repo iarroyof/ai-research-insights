@@ -64,6 +64,9 @@ services:
     volumes:
       - ./services/api:/app
       - ./config:/app/config:ro
+      # Eval lab mounted read-write so run_batch/run_single can execute inside the
+      # api container (deps already present) and persist runs/ to the host.
+      - ./evals:/app/evals
     depends_on:
       - postgres
       - opensearch

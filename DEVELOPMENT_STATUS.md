@@ -51,9 +51,16 @@
        is fallback only. Validated real: entailment 1.0, contradiction 1.0;
        4 routing unit tests + claim_support regression green.
 
-  P-2  Shape8 promotion decision
-       Current: sentinel_a cleared, sentinel_c at 0.6724.
-       Action needed: run blue-demon test suite, decide promote or block+diagnose.
+  P-2  Shape8 promotion decision  — sentinel_a RE-CLEARED 2026-06-13 (recommend PROMOTE)
+       Ran sentinel_a live (in-container, http adapter) on the P-7+P-1+P-3 config.
+       Result run shape8_sentinel_a_p7p1p3: 8-scenario avg 0.7247 (> 0.7148 baseline),
+       missed_injected_traps=0 (the gate) → CLEARS. cross_cancer/mdsc_treg (which
+       regressed in the reverted ultra-550b experiment) now healthy (0.8175/0.7212).
+       recommendations.json has forward-looking reward-shaping items (mechanism-graph
+       required-node awareness; unsupported-mechanism penalization) — NOT gate blockers.
+       Remaining for FULL promotion: (a) bump current_stage in reward_shape_registry.yaml,
+       (b) optionally re-run sentinel_c (was 0.6724) with the new config for full rigor.
+       Both are the user's milestone call.
 
   P-3  Reward signal for intent resolution  — ✅ DONE (2026-06-13)
        plan_auto_context records intent_resolution metadata {tier, intent, source,

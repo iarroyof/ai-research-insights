@@ -408,7 +408,21 @@ def _contains_any_text(message: str, markers: tuple[str, ...]) -> bool:
     return any(marker in lower for marker in markers)
 
 
-def _answer_mode(message: str, evidence_assembly: Dict[str, Any] | None, *, correction_only_turn: bool) -> str:
+def _answer_mode(
+    message: str,
+    evidence_assembly: Dict[str, Any] | None,
+    *,
+    correction_only_turn: bool,
+    resolved_query: str | None = None,
+) -> str:
+    # P-4: utterance-about-the-conversation modes (correction, clarification,
+    # phrase_evaluation, diagnostic_trace_answer) are decided ONLY from the raw
+    # message — they describe what the user literally said. Question-type modes
+    # (novice_rewrite, expert_mechanism) may ALSO consider the resolved query so a
+    # context-poor reply ("the second one") that resolves to a mechanism question
+    # gets the right mode. resolved_query is passed only when the caller has it
+    # AND memory.answer_mode_consider_resolved_query is enabled (default off →
+    # behaviour unchanged unless deliberately turned on).
     if correction_only_turn:
         return "correction_acknowledgement"
     if _hold_generation_for_clarification(evidence_assembly):
@@ -432,8 +446,12 @@ def _answer_mode(message: str, evidence_assembly: Dict[str, Any] | None, *, corr
         return "phrase_evaluation"
     if _contains_any_text(message, ("reward model", "evaluator", "trace evidence", "before changing code", "diagnostic", "debug")):
         return "diagnostic_trace_answer"
+    # Question-type modes: consider the raw message and (if provided) the resolved
+    # query, so a context-poor reply that resolves to a mechanism/novice request
+    # is classified correctly.
+    question_text = f"{message}\n{resolved_query}" if resolved_query else message
     if _contains_any_text(
-        message,
+        question_text,
         (
             "novice",
             "one paragraph",
@@ -447,7 +465,7 @@ def _answer_mode(message: str, evidence_assembly: Dict[str, Any] | None, *, corr
         ),
     ):
         return "novice_rewrite"
-    if _contains_any_text(message, ("mechanism", "mechanistic", "pathway", "explain how", "why does")):
+    if _contains_any_text(question_text, ("mechanism", "mechanistic", "pathway", "explain how", "why does")):
         return "expert_mechanism"
     return "direct_answer"
 
@@ -809,7 +827,12 @@ async def chat(req: Request, body: ChatRequest):
     if evidence_assembly_context:
         prompt = f"{evidence_assembly_context}\n\nGrounded task prompt:\n{prompt}"
     active_evidence_assembly = (auto_context_plan.get("evidence_assembly") or {}) if auto_context_plan else {}
-    answer_mode = preliminary_answer_mode if diagnostic_or_correction_mode else _answer_mode(body.message, active_evidence_assembly, correction_only_turn=correction_only_turn)
+    # P-4 (default off): let question-type answer modes reconsider the resolved
+    # query for context-poor replies. No-op unless answer_mode_consider_resolved_query.
+    _resolved_query = None
+    if settings.memory.answer_mode_consider_resolved_query:
+        _resolved_query = ((auto_context_plan or {}).get("intent_resolution") or {}).get("effective_query") or None
+    answer_mode = preliminary_answer_mode if diagnostic_or_correction_mode else _answer_mode(body.message, active_evidence_assembly, correction_only_turn=correction_only_turn, resolved_query=_resolved_query)
     answer_mode_contract = ANSWER_MODE_CONTRACTS.get(answer_mode, ANSWER_MODE_CONTRACTS["direct_answer"])
     answer_mode_context = _answer_mode_prompt(answer_mode, active_evidence_assembly)
     if not correction_only_turn:

@@ -110,6 +110,10 @@ class MemoryCfg(BaseModel):
     auto_context_llm_refine: bool = True
     entity_grounding_enabled: bool = True
     auto_context_llm_notes: bool = True
+    # P-4: when True, question-type answer modes (novice_rewrite, expert_mechanism)
+    # also consider the resolved effective_query for context-poor replies. Default
+    # off to preserve current answer-mode behaviour until gated by an eval run.
+    answer_mode_consider_resolved_query: bool = False
     contradiction_threshold: float = 0.35
     nli_enabled: bool = True
     nli_provider: str = "hf_api"  # hf_api | http | llm | heuristic | local

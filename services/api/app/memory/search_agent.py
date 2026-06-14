@@ -408,6 +408,7 @@ class AutoContextPlan:
     candidate_frames: list[dict[str, Any]] = field(default_factory=list)
     used_llm: bool = False
     planner_note: str = ""
+    intent_resolution: dict[str, Any] = field(default_factory=dict)  # P-3
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -1021,6 +1022,8 @@ async def plan_auto_context(
     _context_poor = _is_context_poor(message)
     _resolved: dict[str, str] | None = None
     _eff_msg = message
+    _router: dict[str, Any] | None = None
+    _intent_tier = "none"  # P-3: which tier resolved a context-poor message
     if _context_poor and allow_llm_refine:
         # ── Tier-1 zero-shot intent router (P-7) ───────────────────────────
         # Cheap classifier (small NIM primary, HF MNLI fallback) decides intent
@@ -1034,6 +1037,7 @@ async def plan_auto_context(
             and _router.get("intent") == "prior_context"
             and float(_router.get("confidence", 0.0)) >= ROUTER_CONF_THRESHOLD
         ):
+            _intent_tier = "tier1_router"
             _resolved = {
                 "intent": "prior_context",
                 "effective_query": "",
@@ -1051,6 +1055,7 @@ async def plan_auto_context(
                 llm_model=llm_model,
                 llm_api_format=llm_api_format,
             )
+            _intent_tier = "tier2_120b" if _resolved else "heuristic"
             if _resolved and _resolved.get("intent") in {"new_query", "augment_prior"} and _resolved.get("effective_query"):
                 _eff_msg = _resolved["effective_query"]
 
@@ -1135,6 +1140,28 @@ async def plan_auto_context(
         used_llm=used_llm,
         used_notes=bool(notes),
     )
+    # ── P-3: intent-resolution reward attribution metadata ──────────────────
+    # Records WHICH tier resolved a context-poor message and the resolved intent,
+    # with a (state, action) key so observe_turn can credit the decision with the
+    # turn reward via the existing ActionValue table. Empty for non-context-poor
+    # turns (no intent resolution happened). This is the reward SIGNAL (P-3); the
+    # learning loop that reads it back to bias tier choice is future work.
+    intent_resolution: dict[str, Any] = {}
+    if _context_poor and _intent_tier != "none":
+        _ir_intent = str((_resolved or {}).get("intent") or "heuristic")
+        intent_resolution = {
+            "tier": _intent_tier,
+            "intent": _ir_intent,
+            "source": str((_router or {}).get("source") or ("context_manager" if _intent_tier == "tier2_120b" else "")),
+            "confidence": round(float((_router or {}).get("confidence") or 0.0), 4),
+            "state_key": f"intentres|len={_length_bucket(message)}",
+            "action_key": f"{_intent_tier}:{_ir_intent}",
+            # P-4: the resolved retrieval query (rewrite for new_query/augment_prior;
+            # equals the raw message for prior_context). Lets the answer-mode
+            # selector optionally reconsider question-type modes for context-poor
+            # replies — gated by memory.answer_mode_consider_resolved_query.
+            "effective_query": _eff_msg,
+        }
     return AutoContextPlan(
         state_key=state,
         action_key=action,
@@ -1147,6 +1174,7 @@ async def plan_auto_context(
         candidate_frames=_candidate_frames_from_variants(variants),
         used_llm=used_llm,
         planner_note=planner_note,
+        intent_resolution=intent_resolution,
     )
 
 

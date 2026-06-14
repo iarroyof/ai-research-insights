@@ -12,8 +12,22 @@ import httpx
 from app.clients.llm import LLMClient
 from app.config import settings
 from app.memory.rewards import lexical_overlap, terms
+from app.prompts.agent_prompts import nli_system_prompt
 from app.services.provider_metrics import record_provider_call
 from app.services.provider_queue import async_provider_slot
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+# LLM-NLI fallback premise/hypothesis truncation (configurable — no hardcoding,
+# ARCHITECTURE.md rule 13). The model/provider/max_tokens come from agent_models.nli.
+_NLI_PREMISE_MAX_CHARS: int = _env_int("NLI_LLM_PREMISE_MAX_CHARS", 1200)
+_NLI_HYPOTHESIS_MAX_CHARS: int = _env_int("NLI_LLM_HYPOTHESIS_MAX_CHARS", 500)
 
 
 def triple_claim(triple: Dict[str, Any]) -> str:
@@ -339,25 +353,21 @@ async def _hf_api_nli(premise: str, hypothesis: str) -> Dict[str, Any]:
 
 
 async def _llm_nli(premise: str, hypothesis: str) -> Dict[str, Any]:
+    # P-1: routed through agent_models["nli"] (agent="nli"); model, provider,
+    # max_tokens come from config/default.yaml — no longer hardwired to
+    # context_manager_provider. System prompt from the agent_prompts factory.
     messages = [
-        {
-            "role": "system",
-            "content": (
-                "Classify biomedical natural-language inference. Return compact JSON only with keys "
-                "label, entailment, contradiction, neutral. Label must be entailment, contradiction, or neutral."
-            ),
-        },
+        {"role": "system", "content": nli_system_prompt()},
         {
             "role": "user",
-            "content": f"Premise/source sentence:\n{premise[:1200]}\n\nHypothesis/claim:\n{hypothesis[:500]}",
+            "content": (
+                f"Premise/source sentence:\n{premise[:_NLI_PREMISE_MAX_CHARS]}\n\n"
+                f"Hypothesis/claim:\n{hypothesis[:_NLI_HYPOTHESIS_MAX_CHARS]}"
+            ),
         },
     ]
     try:
-        text = await LLMClient().chat_once(
-            messages,
-            provider=settings.llm.context_manager_provider,
-            max_tokens=120,
-        )
+        text = await LLMClient().chat_once(messages, agent="nli")
         start = text.find("{")
         end = text.rfind("}")
         data = json.loads(text[start : end + 1]) if start >= 0 and end > start else {}

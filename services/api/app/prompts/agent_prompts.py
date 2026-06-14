@@ -317,14 +317,77 @@ def nli_system_prompt() -> str:
     The NLI task is always entailment/contradiction/neutral classification.
     No operating-mode variation is needed at this layer.
 
-    Note: _llm_nli() in nli.py currently uses context_manager_provider directly
-    rather than the agent_models routing. This is a known gap tracked in
-    DEVELOPMENT_STATUS.md (item P-1).
+    Used by _llm_nli() in nli.py, which routes through agent_models["nli"]
+    (agent="nli") as of P-1 (2026-06-13).
     """
     return (
         "Classify biomedical natural-language inference. Return compact JSON only "
         "with keys label, entailment, contradiction, neutral. "
         "Label must be one of: entailment, contradiction, neutral."
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 8. Intent router agent  (tier-1 of the context-poor cascade — P-7)
+#    classify_intent_zeroshot() in memory/intent_router.py
+#
+#    Sits between the tier-0 lexical rules (_is_context_poor) and the tier-2
+#    120b context_manager (resolve_message_intent). Its ONLY job is to classify
+#    intent — it does NOT rewrite the query. High-confidence prior_context is
+#    resolved here cheaply (no rewrite needed); new_query/augment_prior and
+#    low-confidence cases escalate to the 120b for the effective_query rewrite.
+#
+#    Two backends share these label definitions:
+#      - NIM primary: a small generative model returns one label (router_system_prompt).
+#      - MNLI fallback: zero-shot entailment scores each hypothesis (ROUTER_INTENT_HYPOTHESES).
+#    The label set is identical to resolve_message_intent's three intents.
+# ════════════════════════════════════════════════════════════════════════════
+
+# Canonical intent labels — keep in sync with resolve_message_intent().
+ROUTER_INTENT_LABELS: tuple[str, ...] = ("prior_context", "new_query", "augment_prior")
+
+# Zero-shot (MNLI) hypothesis templates: one natural-language statement per intent.
+# The classifier scores entailment of each against the premise (recent turn + message);
+# argmax → intent, entailment probability → confidence.
+ROUTER_INTENT_HYPOTHESES: dict[str, str] = {
+    "prior_context": (
+        "The user is replying to or referring back to the assistant's previous "
+        "message, options, or topic, without introducing a new biomedical subject."
+    ),
+    "new_query": (
+        "The user is asking a new, self-contained biomedical question about a "
+        "different subject."
+    ),
+    "augment_prior": (
+        "The user is adding new biomedical detail that extends or refines the "
+        "earlier topic."
+    ),
+}
+
+
+def router_system_prompt() -> str:
+    """System prompt for the NIM-primary intent router (generative classifier).
+
+    Identity only: who the model is and the closed label set. The task data
+    (conversation tail + message) is supplied in the user message by the caller.
+    Static — the label set does not vary by turn; the conversational context that
+    DOES vary is data, not identity, so it belongs in the user message.
+
+    Returns one compact JSON object: {"intent": <label>, "confidence": <0..1>}.
+    """
+    return (
+        "You are a conversation intent router for a biomedical research assistant. "
+        "Given the recent conversation turn and the user's latest message, classify "
+        "the message into exactly one intent:\n"
+        "- prior_context: the message replies to or refers back to the assistant's "
+        "previous message/options and carries no new biomedical subject of its own "
+        "(e.g. 'yes', 'the second one', 'go with that').\n"
+        "- new_query: the message is a new, self-contained biomedical question on a "
+        "different subject.\n"
+        "- augment_prior: the message adds new biomedical detail that extends or "
+        "refines the earlier topic.\n"
+        "Return compact JSON only: {\"intent\": \"prior_context|new_query|augment_prior\", "
+        "\"confidence\": <number between 0 and 1>}. No prose."
     )
 
 
@@ -341,4 +404,5 @@ PROMPT_REGISTRY: dict[str, object] = {
     "ner_grounding": ner_grounding_system_prompt,
     "reflection": reflection_system_prompt,
     "nli": nli_system_prompt,
+    "router": router_system_prompt,
 }

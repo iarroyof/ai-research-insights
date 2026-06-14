@@ -1,7 +1,7 @@
 # Sabia — Full Agentic Architecture & Engineering Reference
 
 > **Development-agent canonical reference.** Read this before making any change.
-> Last updated: 2026-06-12.
+> Last updated: 2026-06-13.
 > For WP/milestone status see: [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
 
 ---
@@ -137,17 +137,45 @@ Per-agent routing: _agent_provider_config(agent_name) reads
   Effect: updates GapSpec.confirmed_entities, .missing_entities, .entity_map
   Toggle: settings.memory.entity_grounding_enabled
 
-### 3f. NLI Agent  (NOT in agent_models routing -- KNOWN GAP)
-  Model:   uses settings.llm.context_manager_provider directly (not agent= param)
-  Called:  nli.py _llm_nli()  (LLM fallback when HuggingFace NLI unavailable)
-  System prompt [STATIC]:
-    "Classify biomedical natural-language inference. Return compact JSON only..."
+### 3f. NLI Agent  (agent="nli" — routed via agent_models since P-1, 2026-06-13)
+  Model:   nvidia/llama-3.3-nemotron-super-49b-v1.5 (agent_models.nli, max_tokens=1024
+           — super-49b returns EMPTY under a tight cap; 1024 gives JSON headroom)
+  Called:  nli.py _llm_nli()  (generative LLM fallback, used only when the HF MNLI
+           path is unavailable; HF MNLI = memory.nli_model PubMedBERT-MNLI-MedNLI
+           remains the primary factuality authority)
+  System prompt [STATIC]: nli_system_prompt() from agent_prompts.py
   User message [DYNAMIC per turn]:
-    - premise sentence (up to 1200 chars)
-    - hypothesis/claim (up to 500 chars)
-  Known gap: _llm_nli() does not use the agent_models routing system. If NLI
-    ever needs a dedicated model config, add "nli" key to agent_models and
-    update nli.py to pass agent="nli" to LLMClient.
+    - premise sentence (NLI_LLM_PREMISE_MAX_CHARS, default 1200)
+    - hypothesis/claim (NLI_LLM_HYPOTHESIS_MAX_CHARS, default 500)
+  P-1 FIXED: was settings.llm.context_manager_provider + hardcoded max_tokens=120;
+    now passes agent="nli" so model/provider/max_tokens come from agent_models.
+    Validated real: entailment fixture -> entailment 1.0, contradiction -> 1.0.
+
+### 3g. Intent Router Agent  (agent="router")  -- tier-1 of context-poor cascade (P-7)
+  Model:   nvidia/nemotron-3-nano-30b-a3b (agent_models.router, max_tokens=256 —
+           Nemotron spends budget on reasoning first; <~200 yields EMPTY content)
+  Fallback: HF zero-shot MNLI (facebook/bart-large-mnli) via
+           app.services.zero_shot.score_labels (SYNC — wrapped in asyncio.to_thread).
+  Called:  search_agent.py plan_auto_context() -> intent_router.classify_intent_zeroshot()
+           ONLY when _is_context_poor(message)=True AND allow_llm_refine=True,
+           BEFORE the 120b resolve_message_intent.
+  System prompt [STATIC]: router_system_prompt() in agent_prompts.py.
+  Returns: {intent: prior_context|new_query|augment_prior, confidence, source}.
+           CLASSIFIES ONLY — does not rewrite the query.
+  Cascade effect:
+    prior_context AND confidence>=ROUTER_CONF_THRESHOLD (0.6)
+        -> resolve as prior_context, SKIP the 120b (no rewrite needed)
+    new_query/augment_prior OR low confidence OR both backends fail
+        -> escalate to resolve_message_intent (120b) for the effective_query rewrite
+  Answer-derived signal: _premise() appends an options hint when the prior
+    assistant turn offered a lettered clarification list. Detection
+    (_text_offers_lettered_options) MIRRORS the frontend checkbox trigger
+    (streamlit extract_clarification_options) — shared contract, keep in sync.
+    This raises prior_context predictive power for typed replies to "a/b/c?"
+    questions without conflicting with the UI checkbox launch.
+  All knobs env-backed: ROUTER_CONF_THRESHOLD, ROUTER_NIM_DEFAULT_CONF,
+    ROUTER_NIM_FALLBACK_CONF, ROUTER_PREMISE_TURNS, ROUTER_PREMISE_MAX_CHARS,
+    ROUTER_NOTES_SCAN_LIMIT (rule 13).
 
 ---
 
@@ -218,7 +246,11 @@ biomedical anchors -> BM25 gets nonsense queries -> retrieval broken.
          -> format as [Turn N] role: content[:300]
          -> inject as recent_turns_note into notes list
 
-  plan_auto_context() -> resolve_message_intent() [context_manager, 120b, med]:
+  plan_auto_context() cascade (P-7):
+    tier-1: classify_intent_zeroshot() [router agent, nano NIM + MNLI fallback]
+            high-confidence prior_context -> resolve here, skip the 120b
+    tier-2: resolve_message_intent() [context_manager, 120b, med] only when
+            tier-1 says new_query/augment_prior or is unsure
     Reads from notes: active_terms, summary, recent_queries, recent_turns
     Returns: {intent, effective_query} -> sets _eff_msg
 
@@ -397,15 +429,42 @@ Passed: build_auto_context() -> chat.py -> policy.plan() via gap_spec= param.
   8.  Agent routing is per-call (agent= param) NOT per-session.
   9.  _eff_msg is used for retrieval. Raw message is used for _answer_mode().
       These are intentionally separate -- do not conflate.
-  10. NLI agent uses context_manager_provider directly, not agent_models routing.
-      (Known gap -- see section 3f.)
+  10. NLI agent is routed via agent_models["nli"] (agent="nli") since P-1.
+      HF MNLI (memory.nli_model) remains the primary NLI/factuality authority;
+      the agent="nli" LLM path is a fallback only. See section 3f.
   11. Do NOT start local GPU services: llm, worker-gpu, models-init, rebel-extractor.
   12. Do NOT restart Docker, containerd, prune networks, stop unrelated containers,
       or reboot host without explicit user approval.
+  13. NO HARDCODING. Every tunable/behavioural literal (threshold, default
+      confidence, truncation length, batch size, retry count, model id, scan
+      limit, etc.) MUST be a named, configurable constant — env-backed via
+      os.getenv (matching zero_shot.py/nli.py) or a config/default.yaml field
+      parsed in config.py. No magic numbers inline. Exception: a value that must
+      stay in lock-step with another component (e.g. _MAX_OPTION_LETTERS mirrors
+      the frontend) is a fixed NAMED constant with a comment explaining why it is
+      not independently tunable. Any agent adding code follows this rule and
+      records new knobs in DEVELOPMENT_STATUS.md.
 
 ---
 
 ## 12. Changelog
+
+  2026-06-13:
+    - P-7 tier-1 zero-shot intent router (section 3g): nano NIM primary + HF MNLI
+      fallback, inserted before the 120b in plan_auto_context. prior_context
+      short-circuits the 120b; rewrite intents escalate. New file
+      memory/intent_router.py; router agent_models entry; router_system_prompt +
+      ROUTER_INTENT_HYPOTHESES in agent_prompts.py.
+    - Answer-derived intent signal: prior-turn lettered-options detection mirrors
+      the frontend checkbox trigger (shared contract) and biases prior_context.
+    - Engineering rule 13 (NO HARDCODING) established; all router knobs env-backed.
+    - Validated: 17/17 router unit tests, 36/36 search_agent regression, real
+      NVIDIA nano + HF MNLI smoke (incl. options-hint path: "b" -> prior_context).
+    - P-1 FIXED (section 3f): _llm_nli now routes via agent_models["nli"]
+      (agent="nli"), system prompt from factory, env-backed truncation; nli entry
+      added to agent_models (super-49b, max_tokens=1024). HF MNLI stays primary.
+    - Git: baseline of all uncommitted 2026-06 work committed (05803c0) + merged
+      to main (1df7386); P-7 + P-1 on feat/zero-shot-intent-router (PR #1).
 
   2026-06-12 (session 2):
     - Dynamic system prompt factory: app/prompts/agent_prompts.py

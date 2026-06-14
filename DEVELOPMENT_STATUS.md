@@ -1,7 +1,7 @@
 # Sabia Development Status Register
 
 > Linked from: [ARCHITECTURE.md](ARCHITECTURE.md)
-> Last updated: 2026-06-12
+> Last updated: 2026-06-13
 
 ---
 
@@ -42,10 +42,14 @@
 
 ## Pending Items
 
-  P-1  NLI agent routing gap
-       nli.py _llm_nli() uses settings.llm.context_manager_provider directly.
-       Add "nli" key to agent_models + pass agent="nli" to LLMClient if a
-       dedicated model config is needed for NLI.
+  P-1  NLI agent routing gap  — ✅ DONE (2026-06-13)
+       _llm_nli() now passes agent="nli"; nli entry added to agent_models
+       (super-49b, max_tokens=1024 — empty under tighter caps); system prompt
+       from nli_system_prompt(); premise/hypothesis truncation env-backed
+       (NLI_LLM_PREMISE_MAX_CHARS/NLI_LLM_HYPOTHESIS_MAX_CHARS). HF MNLI
+       (memory.nli_model) remains the primary factuality authority; the LLM path
+       is fallback only. Validated real: entailment 1.0, contradiction 1.0;
+       4 routing unit tests + claim_support regression green.
 
   P-2  Shape8 promotion decision
        Current: sentinel_a cleared, sentinel_c at 0.6724.
@@ -125,3 +129,53 @@ Extension guide:
          tier-2 (120b, reasoning=medium): genuinely ambiguous multi-turn reference
        Expected savings: >60% of resolve_message_intent() calls never reach 120b.
        See P-3 for reward tracking once correct intent resolution is confirmed.
+
+## P-7 IMPLEMENTED (2026-06-13): Tier-1 zero-shot intent router
+
+Inserted between tier-0 lexical rules (_is_context_poor) and tier-2 120b (resolve_message_intent) in plan_auto_context.
+
+- Backends: NIM primary (nvidia/nemotron-3-nano-30b-a3b via agent_models.router) + HF MNLI fallback (facebook/bart-large-mnli via app.services.zero_shot.score_labels, wrapped in asyncio.to_thread). Both validated against real providers.
+- Behavior: high-confidence prior_context (conf >= ROUTER_CONF_THRESHOLD=0.6) short-circuits the 120b (no query rewrite needed); new_query/augment_prior and low-confidence escalate to the 120b for the effective_query rewrite.
+- Files: config/default.yaml (router agent_models, max_tokens=256 — Nemotron needs reasoning headroom), prompts/agent_prompts.py (router_system_prompt + ROUTER_INTENT_HYPOTHESES + registry), memory/intent_router.py (NEW), memory/search_agent.py (cascade integration + import), tests/test_intent_router.py (NEW, 12 tests).
+- Validation: 12/12 unit, 36/36 search_agent regression, real NVIDIA nano + HF MNLI smoke (the second one->prior_context 0.96 nim; EGFR question->new_query 0.96 nim).
+- Note: replaces the naive lexical _is_followup_reference gate for context-poor routing; _is_followup_reference still used elsewhere (P-1/anchor robustness remains future work).
+
+### P-7 follow-up (same day): answer-derived signal + no-hardcoding pass
+
+- Answer-derived intent signal: intent_router._text_offers_lettered_options detects
+  when the prior assistant turn asked a lettered (a/b/c) clarification question;
+  _premise() appends a hint that biases the router toward prior_context. This
+  MIRRORS the frontend checkbox trigger (streamlit extract_clarification_options) —
+  shared contract documented in BOTH files; do not let them diverge. Does NOT
+  conflict with the UI checkbox launch (frontend renders; backend only classifies).
+  Real smoke: prior turn with a/b/c + reply "b" -> prior_context 0.96.
+- No-hardcoding refactor: all router literals are now env-backed named constants:
+  ROUTER_CONF_THRESHOLD (0.6), ROUTER_NIM_DEFAULT_CONF (0.85),
+  ROUTER_NIM_FALLBACK_CONF (0.7), ROUTER_PREMISE_TURNS (2),
+  ROUTER_PREMISE_MAX_CHARS (800), ROUTER_NOTES_SCAN_LIMIT (8).
+  _MAX_OPTION_LETTERS is a fixed named constant (frontend-locked, not env).
+- Tests: 17/17 (added option-detection + premise-hint + constant-referenced asserts).
+
+---
+
+## Engineering Standards (apply to ALL agents/sessions)
+
+- NO HARDCODING (ARCHITECTURE.md rule 13): every tunable literal is a named,
+  configurable constant (env-backed via os.getenv like zero_shot.py/nli.py, or a
+  config/default.yaml field). No magic numbers inline. Frontend-locked values stay
+  fixed named constants with a sync comment. Record new knobs here when added.
+- Two-level working memory to revisit EVERY session before changing code:
+  (1) ARCHITECTURE.md (canonical system reference) + DEVELOPMENT_STATUS.md (this
+  register) on blue-demon; (2) the dev agent's own memory (MEMORY.md index +
+  architecture_sabia.md / project_gapspec_wps.md). Grep before adding (rule 1).
+
+## Session-Termination Handoff (2026-06-13)
+
+- Source of truth = blue-demon working tree; access via plink/pscp (PuTTY), creds
+  ../blue-demon.txt; GitHub token ../../github_toke.txt. No gh / no credential.helper
+  on blue-demon. API container ai-research-insights-api-1 bind-mounts services/api->/app.
+- Local doc-artifacts mirrors (source_snapshot/, remote_edit/) are STALE — never
+  trust them for code; read blue-demon.
+- Before ending any session: update ARCHITECTURE.md + DEVELOPMENT_STATUS.md for any
+  change, mirror into the dev agent memory, and re-state these standards so the next
+  agent syncs to the docs and obeys rule 13.

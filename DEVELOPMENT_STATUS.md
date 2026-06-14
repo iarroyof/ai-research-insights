@@ -186,8 +186,14 @@ HEAD truncation (or a count cap) before a downstream consumer sees it.
   AND the 120b resolve_message_intent (same recent_turns) silently missed them, diverging
   from the frontend (which parses the full answer for checkboxes). Fix: deterministic head
   marker CLARIFICATION_OPENING_MARKER (survives [:300]) + clarification contract now opens
-  with the marker and puts lettered options last. Detector _prior_turn_is_clarification ORs
-  marker + lettered options. 18/18 router tests incl. marker-survives-truncation.
+  with the marker and puts lettered options last. 19/19 router tests.
+  REFINEMENT (2026-06-14): marker strengthened to a bracketed sentinel "[Clarification
+  needed]" (distinctive, exact, code-emitted) and PROMOTED to a deterministic tier-0.5 in
+  plan_auto_context: context-poor + marker -> prior_context with NO classifier/120b
+  (prior_turn_clarification_marker). The classifier is NOT removed — it's reserved for
+  no-marker context-poor replies (coreference/"continue"/"yes" after a normal answer), the
+  majority, since clarification answer-mode is a minority of turns. _prior_turn_is_clarification
+  (marker OR lettered) stays as the softer tier-1 premise hint.
 - Secondary, LOW risk, EASY if needed (not done — flagged):
   * ner_grounding ctx_entities[:40]→[:30] (search_agent ~1726/1745): silent COUNT cap; a key
     entity ranked >40 is dropped. Easy: sort query/confirmed entities to the front before the cap.

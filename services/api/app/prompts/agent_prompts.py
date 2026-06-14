@@ -365,14 +365,18 @@ ROUTER_INTENT_HYPOTHESES: dict[str, str] = {
 }
 
 
-# Shared marker: clarification answers OPEN with this exact phrase (prepended
-# deterministically by chat._opening_clarification_prefix). It is the truncation-proof
-# signal that the prior turn asked for clarification — the lettered options live at the
-# END of the answer and are routinely truncated away from recent_turns ([:300]) before
-# the token-limited intent router/rule ever sees them, but the head marker survives.
+# Shared structured sentinel: clarification answers OPEN with this exact bracketed
+# token, prepended DETERMINISTICALLY by chat._opening_clarification_prefix (code, not the
+# model — so detection is exact, no parsing ambiguity). It is the truncation-proof signal
+# that the prior turn asked for clarification: the lettered options live at the END of the
+# answer and are routinely truncated away from recent_turns ([:300]) before the
+# token-limited router ever sees them, but this head sentinel survives. Because it is
+# code-emitted and exact, a context-poor reply following it routes prior_context
+# DETERMINISTICALLY — no classifier call needed for that case (intent_router.plan tier-0.5).
+# The bracketed form is distinctive enough to avoid false positives from prose.
 # Producer: routers/chat.py::_opening_clarification_prefix + ANSWER_MODE_CONTRACTS["clarification"].
-# Detector: memory/intent_router.py::_prior_turn_is_clarification. Keep all three in sync.
-CLARIFICATION_OPENING_MARKER = "Clarification needed —"
+# Detector: memory/intent_router.py::prior_turn_clarification_marker. Keep all three in sync.
+CLARIFICATION_OPENING_MARKER = "[Clarification needed]"
 
 
 def router_system_prompt() -> str:

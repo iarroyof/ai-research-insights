@@ -99,6 +99,16 @@ class OptionDetectionTests(unittest.TestCase):
         self.assertFalse(ir._prior_turn_is_clarification([{"recent_turns": ["no opts"]}]))
         self.assertFalse(ir._prior_turn_is_clarification(None))
 
+    def test_prior_turn_clarification_marker_precise(self):
+        from app.prompts.agent_prompts import CLARIFICATION_OPENING_MARKER
+        notes = [{"recent_turns": [f"Assistant: {CLARIFICATION_OPENING_MARKER} options at the end."]}]
+        self.assertTrue(ir.prior_turn_clarification_marker(notes))
+        # No bracketed sentinel -> no deterministic route (avoids prose false positives).
+        self.assertFalse(ir.prior_turn_clarification_marker(
+            [{"recent_turns": ["User: i need some clarification on this"]}]
+        ))
+        self.assertFalse(ir.prior_turn_clarification_marker(None))
+
     def test_prior_turn_is_clarification_via_head_marker_when_options_truncated(self):
         # Simulates recent_turns truncated to [:300]: head marker present, options gone.
         from app.prompts.agent_prompts import CLARIFICATION_OPENING_MARKER

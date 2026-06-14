@@ -168,11 +168,20 @@ Per-agent routing: _agent_provider_config(agent_name) reads
     new_query/augment_prior OR low confidence OR both backends fail
         -> escalate to resolve_message_intent (120b) for the effective_query rewrite
   Answer-derived signal: _premise() appends an options hint when the prior
-    assistant turn offered a lettered clarification list. Detection
-    (_text_offers_lettered_options) MIRRORS the frontend checkbox trigger
-    (streamlit extract_clarification_options) — shared contract, keep in sync.
-    This raises prior_context predictive power for typed replies to "a/b/c?"
-    questions without conflicting with the UI checkbox launch.
+    assistant turn asked for clarification (_prior_turn_is_clarification). Two
+    signals OR'd: (1) CLARIFICATION_OPENING_MARKER ("Clarification needed —") at
+    the answer HEAD — prepended deterministically by chat._opening_clarification_prefix,
+    TRUNCATION-PROOF; (2) a lettered (a/b/c) option list, mirroring the frontend
+    checkbox trigger (extract_clarification_options).
+    ⚠️ TRUNCATION FAILURE MODE (fixed 2026-06-14): clarification options live at the
+    END of the answer, but recent_turns are head-truncated to [:300] in
+    build_auto_context, so the token-limited router (and the 120b resolve_message_intent,
+    same recent_turns) silently lost them. The head marker survives [:300] and is the
+    robust signal; the lettered check stays aligned with the UI. The clarification
+    ANSWER_MODE_CONTRACT now opens with the marker + puts options last.
+    Shared contract across THREE sites — keep in sync: agent_prompts.CLARIFICATION_OPENING_MARKER,
+    chat._opening_clarification_prefix/ANSWER_MODE_CONTRACTS["clarification"] (producer),
+    intent_router._prior_turn_is_clarification (detector).
   All knobs env-backed: ROUTER_CONF_THRESHOLD, ROUTER_NIM_DEFAULT_CONF,
     ROUTER_NIM_FALLBACK_CONF, ROUTER_PREMISE_TURNS, ROUTER_PREMISE_MAX_CHARS,
     ROUTER_NOTES_SCAN_LIMIT (rule 13).

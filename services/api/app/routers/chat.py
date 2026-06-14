@@ -17,7 +17,7 @@ from app.config import settings
 # LLM client
 from app.clients.llm import LLMClient
 from app.memory.policy import ContextPolicy
-from app.prompts.agent_prompts import answer_system_prompt
+from app.prompts.agent_prompts import answer_system_prompt, CLARIFICATION_OPENING_MARKER
 from app.memory.search_agent import build_auto_context
 from app.memory.store import MemoryStore
 from app.services.provider_metrics import snapshot_provider_metrics
@@ -159,7 +159,11 @@ def _opening_clarification_prefix(evidence_assembly: Dict[str, Any] | None) -> s
     if level_summary:
         reasoning_parts.append(f"retrieved levels {level_summary}")
     reasoning = "; ".join(reasoning_parts)
+    # Lead with the shared head marker: it survives recent_turns [:300] truncation so the
+    # token-limited intent router/rule still detect a clarification turn even when the
+    # lettered options at the END are cut off. Also tells the user to look at the end.
     return (
+        f"{CLARIFICATION_OPENING_MARKER} the options to choose from are listed at the end of this message. "
         "I will assemble the supported evidence pieces first and keep missing links explicit. "
         f"From the current evidence puzzle, {reasoning}. "
         f"To refine the explanation, which interpretation should lead: {frame_text}?\n\n"
@@ -399,7 +403,12 @@ ANSWER_MODE_CONTRACTS: Dict[str, str] = {
         "If the user references a correction, preserve that correction and do not reverse a prior false-premise rejection."
     ),
     "correction_acknowledgement": "Acknowledge the user correction and update scope without adding new evidence claims.",
-    "clarification": "Summarize the current puzzle state and ask one focused textual clarification.",
+    "clarification": (
+        "Open by telling the user the clarification options are listed at the END of your message. "
+        "Then summarize the current puzzle state. FINISH with the single focused clarification as an "
+        "explicit lettered list (a), b), c) ...) of the candidate interpretations, one per line, so the "
+        "user (and the UI) can select among them. Put the options last; do not bury them mid-answer."
+    ),
 }
 
 

@@ -32,6 +32,7 @@ from typing import Any
 
 from app.clients.llm import LLMClient
 from app.prompts.agent_prompts import (
+    CLARIFICATION_OPENING_MARKER,
     ROUTER_INTENT_HYPOTHESES,
     ROUTER_INTENT_LABELS,
     router_system_prompt,
@@ -119,11 +120,20 @@ def _recent_turn_text(notes: list[dict[str, Any]] | None) -> str:
     return ""
 
 
-def _prior_turn_offered_options(notes: list[dict[str, Any]] | None) -> bool:
-    """True when the most recent assistant turn presented a lettered clarification
-    option list. Reuses the same detection as the frontend checkbox launch so the
-    backend router and the UI agree on what a multi-option clarification is."""
-    return _text_offers_lettered_options(_recent_turn_text(notes))
+def _prior_turn_is_clarification(notes: list[dict[str, Any]] | None) -> bool:
+    """True when the most recent assistant turn asked for clarification.
+
+    Two signals, OR'd:
+      1. CLARIFICATION_OPENING_MARKER at the head — deterministic, prepended by
+         chat._opening_clarification_prefix, survives recent_turns [:300] truncation.
+      2. A lettered (a/b/c) option list — same rule as the frontend checkbox launch;
+         only present when the options weren't truncated away.
+    The marker is the robust signal; the lettered check covers short answers and stays
+    aligned with the UI. Keep in sync with agent_prompts.CLARIFICATION_OPENING_MARKER."""
+    text = _recent_turn_text(notes)
+    if CLARIFICATION_OPENING_MARKER and CLARIFICATION_OPENING_MARKER.lower() in text.lower():
+        return True
+    return _text_offers_lettered_options(text)
 
 
 # Structural hint appended to the premise when the prior turn offered options.
@@ -139,7 +149,7 @@ _OPTIONS_HINT = (
 
 def _premise(message: str, notes: list[dict[str, Any]] | None) -> str:
     tail = _recent_turn_text(notes)
-    hint = _OPTIONS_HINT if _prior_turn_offered_options(notes) else ""
+    hint = _OPTIONS_HINT if _prior_turn_is_clarification(notes) else ""
     base = f"{tail}\nUser: {message}" if tail else f"User: {message}"
     return base + hint
 

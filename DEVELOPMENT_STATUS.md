@@ -176,6 +176,28 @@ Inserted between tier-0 lexical rules (_is_context_poor) and tier-2 120b (resolv
 
 ---
 
+## P-8: Tail-content head-truncation audit (2026-06-14)
+
+Failure mode: important content placed at the TAIL of a message is silently lost to a
+HEAD truncation (or a count cap) before a downstream consumer sees it.
+
+- ✅ FIXED (primary): clarification OPTIONS live at the answer tail, but recent_turns are
+  head-truncated to [:300] in build_auto_context → the tier-1 intent router (token-limited)
+  AND the 120b resolve_message_intent (same recent_turns) silently missed them, diverging
+  from the frontend (which parses the full answer for checkboxes). Fix: deterministic head
+  marker CLARIFICATION_OPENING_MARKER (survives [:300]) + clarification contract now opens
+  with the marker and puts lettered options last. Detector _prior_turn_is_clarification ORs
+  marker + lettered options. 18/18 router tests incl. marker-survives-truncation.
+- Secondary, LOW risk, EASY if needed (not done — flagged):
+  * ner_grounding ctx_entities[:40]→[:30] (search_agent ~1726/1745): silent COUNT cap; a key
+    entity ranked >40 is dropped. Easy: sort query/confirmed entities to the front before the cap.
+  * NLI _llm_nli premise[:1200]/hypothesis[:500] (nli.py): head-trunc of a long source
+    window could cut the relevant clause. Already env-configurable (NLI_LLM_*_MAX_CHARS);
+    easy to raise or take a centered window. Low risk (origin sentences are short).
+  * Answer-agent render caps (policy.py text[:900]/[:700]/[:500] etc.): per-item head-trunc for
+    the answer prompt. Lower impact (49b large context, synthesizes). Could append "…(truncated)"
+    so the model knows. Not a silent-routing bug.
+
 ## Engineering Standards (apply to ALL agents/sessions)
 
 - NO HARDCODING (ARCHITECTURE.md rule 13): every tunable literal is a named,

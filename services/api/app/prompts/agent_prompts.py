@@ -365,6 +365,16 @@ ROUTER_INTENT_HYPOTHESES: dict[str, str] = {
 }
 
 
+# Shared marker: clarification answers OPEN with this exact phrase (prepended
+# deterministically by chat._opening_clarification_prefix). It is the truncation-proof
+# signal that the prior turn asked for clarification — the lettered options live at the
+# END of the answer and are routinely truncated away from recent_turns ([:300]) before
+# the token-limited intent router/rule ever sees them, but the head marker survives.
+# Producer: routers/chat.py::_opening_clarification_prefix + ANSWER_MODE_CONTRACTS["clarification"].
+# Detector: memory/intent_router.py::_prior_turn_is_clarification. Keep all three in sync.
+CLARIFICATION_OPENING_MARKER = "Clarification needed —"
+
+
 def router_system_prompt() -> str:
     """System prompt for the NIM-primary intent router (generative classifier).
 

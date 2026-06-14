@@ -93,11 +93,21 @@ class OptionDetectionTests(unittest.TestCase):
         self.assertFalse(ir._text_offers_lettered_options("b) starts at b\nc) next"))
         self.assertFalse(ir._text_offers_lettered_options("plain prose, no options"))
 
-    def test_prior_turn_offered_options_reads_notes(self):
+    def test_prior_turn_is_clarification_via_lettered_options(self):
         notes = [{"recent_turns": ["pick one:\na) x\nb) y"]}]
-        self.assertTrue(ir._prior_turn_offered_options(notes))
-        self.assertFalse(ir._prior_turn_offered_options([{"recent_turns": ["no opts"]}]))
-        self.assertFalse(ir._prior_turn_offered_options(None))
+        self.assertTrue(ir._prior_turn_is_clarification(notes))
+        self.assertFalse(ir._prior_turn_is_clarification([{"recent_turns": ["no opts"]}]))
+        self.assertFalse(ir._prior_turn_is_clarification(None))
+
+    def test_prior_turn_is_clarification_via_head_marker_when_options_truncated(self):
+        # Simulates recent_turns truncated to [:300]: head marker present, options gone.
+        from app.prompts.agent_prompts import CLARIFICATION_OPENING_MARKER
+        truncated = f"Assistant: {CLARIFICATION_OPENING_MARKER} the options are at the end. " + "filler " * 40
+        notes = [{"recent_turns": [truncated]}]
+        self.assertFalse(ir._text_offers_lettered_options(truncated))  # no lettered options survived
+        self.assertTrue(ir._prior_turn_is_clarification(notes))         # marker still detected
+        # And the premise gets the options hint from the marker alone.
+        self.assertIn("lettered options", ir._premise("the second one", notes))
 
 
 ROUTER_LABELS = ("prior_context", "new_query", "augment_prior")

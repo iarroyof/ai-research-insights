@@ -250,6 +250,33 @@ home already exists and the literal should just reference it; ⬜ = needs a new 
   Suggested order (value×ease): G1 + G4 (directly affect router/intent quality, small), then G6
   (cost), then G2/G3/G5/G7 (broad, mechanical). NOT yet implemented — this is the plan.
 
+## P-10: De-bottleneck lexical/regex decision routing (proposed 2026-06-14)
+
+sentinel_c diagnosis: the 0.590 regression is dominated by assistant_generation failures
+(answer quality) + the evidence-layer "mechanistic-chain required-node awareness" gap (top rec on
+BOTH sentinels) + likely live-run variance (sentinel_a improved on the same config). It is NOT
+primarily lexical answer-mode misrouting — answer modes fired correctly because the eval scenarios
+embed trigger words (expert_mechanism×72, phrase_evaluation×48, diagnostic×56 across the run).
+
+BUT (user caveat) lexical routing is a LATENT bottleneck: e.g. "If the user says HGF suppresses
+c-MET, should the chatbot agree?" has no mechanism trigger -> _answer_mode -> direct_answer.
+Lexical only looks fine because the eval plants keywords; paraphrased real queries get misrouted.
+
+Lexical decision points (bottleneck class):
+  - chat._answer_mode (_contains_any_text): expert_mechanism/novice/phrase_eval/diagnostic — HIGH.
+  - search_agent._intent_bucket + _domain_search_frame (mechanistic_context/asks_drug_synergy/
+    analogy_context/cross_domain_probe): query planning — MEDIUM.
+  - _is_followup_reference (FOLLOWUP_CONTEXT_MARKERS) — used in _prior_frame_compatible — MEDIUM.
+  - _is_rewrite_or_diagnostic_followup / _is_phrase_evaluation / _query_ambiguity — LOW-MED.
+
+Design (NOT implemented; gated): reuse app.services.zero_shot.score_labels (bart-large-mnli, the
+intent-router fallback). TIERED like the intent router: lexical fast-path first (precise+free) ->
+zero-shot question-type classifier fallback only when no lexical trigger matches. Keep utterance-
+literal modes (correction, clarification-hold) on rules (P-4 separation principle). DEFAULT-OFF
+behind a config flag (like answer_mode_consider_resolved_query) so zero eval-behaviour change until
+an eval gate confirms benefit — the classifier is a ROBUSTNESS fix, not a confirmed cure for 0.590.
+Generalizes to _intent_bucket next. Implement on user go-ahead.
+
 ## Engineering Standards (apply to ALL agents/sessions)
 
 - NO HARDCODING (ARCHITECTURE.md rule 13): every tunable literal is a named,

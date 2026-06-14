@@ -317,9 +317,8 @@ def nli_system_prompt() -> str:
     The NLI task is always entailment/contradiction/neutral classification.
     No operating-mode variation is needed at this layer.
 
-    Note: _llm_nli() in nli.py currently uses context_manager_provider directly
-    rather than the agent_models routing. This is a known gap tracked in
-    DEVELOPMENT_STATUS.md (item P-1).
+    Used by _llm_nli() in nli.py, which routes through agent_models["nli"]
+    (agent="nli") as of P-1 (2026-06-13).
     """
     return (
         "Classify biomedical natural-language inference. Return compact JSON only "

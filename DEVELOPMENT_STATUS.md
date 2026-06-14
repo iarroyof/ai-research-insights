@@ -42,10 +42,14 @@
 
 ## Pending Items
 
-  P-1  NLI agent routing gap
-       nli.py _llm_nli() uses settings.llm.context_manager_provider directly.
-       Add "nli" key to agent_models + pass agent="nli" to LLMClient if a
-       dedicated model config is needed for NLI.
+  P-1  NLI agent routing gap  — ✅ DONE (2026-06-13)
+       _llm_nli() now passes agent="nli"; nli entry added to agent_models
+       (super-49b, max_tokens=1024 — empty under tighter caps); system prompt
+       from nli_system_prompt(); premise/hypothesis truncation env-backed
+       (NLI_LLM_PREMISE_MAX_CHARS/NLI_LLM_HYPOTHESIS_MAX_CHARS). HF MNLI
+       (memory.nli_model) remains the primary factuality authority; the LLM path
+       is fallback only. Validated real: entailment 1.0, contradiction 1.0;
+       4 routing unit tests + claim_support regression green.
 
   P-2  Shape8 promotion decision
        Current: sentinel_a cleared, sentinel_c at 0.6724.

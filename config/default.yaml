@@ -83,6 +83,16 @@ llm:
       # Nemotron models spend budget on reasoning before the final content; a
       # tiny cap (e.g. 40) yields EMPTY content. 256 reliably returns the JSON.
       max_tokens: 256
+    # P-1: LLM-NLI fallback (nli.py _llm_nli) — generative classifier used only
+    # when the HF MNLI path is unavailable. super-49b emits variable-length
+    # reasoning and returns EMPTY content under a tight cap (verified empty at
+    # 256, sometimes at 512); 1024 gives ample headroom for the compact JSON.
+    # (HF MNLI primary stays on memory.nli_model = PubMedBERT-MNLI-MedNLI and is
+    # the factuality authority; this LLM path is a degraded fallback only.)
+    nli:
+      provider: nvidia
+      model: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+      max_tokens: 1024
 
 memory:
   enabled: true

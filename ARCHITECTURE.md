@@ -137,17 +137,19 @@ Per-agent routing: _agent_provider_config(agent_name) reads
   Effect: updates GapSpec.confirmed_entities, .missing_entities, .entity_map
   Toggle: settings.memory.entity_grounding_enabled
 
-### 3f. NLI Agent  (NOT in agent_models routing -- KNOWN GAP)
-  Model:   uses settings.llm.context_manager_provider directly (not agent= param)
-  Called:  nli.py _llm_nli()  (LLM fallback when HuggingFace NLI unavailable)
-  System prompt [STATIC]:
-    "Classify biomedical natural-language inference. Return compact JSON only..."
+### 3f. NLI Agent  (agent="nli" — routed via agent_models since P-1, 2026-06-13)
+  Model:   nvidia/llama-3.3-nemotron-super-49b-v1.5 (agent_models.nli, max_tokens=1024
+           — super-49b returns EMPTY under a tight cap; 1024 gives JSON headroom)
+  Called:  nli.py _llm_nli()  (generative LLM fallback, used only when the HF MNLI
+           path is unavailable; HF MNLI = memory.nli_model PubMedBERT-MNLI-MedNLI
+           remains the primary factuality authority)
+  System prompt [STATIC]: nli_system_prompt() from agent_prompts.py
   User message [DYNAMIC per turn]:
-    - premise sentence (up to 1200 chars)
-    - hypothesis/claim (up to 500 chars)
-  Known gap: _llm_nli() does not use the agent_models routing system. If NLI
-    ever needs a dedicated model config, add "nli" key to agent_models and
-    update nli.py to pass agent="nli" to LLMClient.
+    - premise sentence (NLI_LLM_PREMISE_MAX_CHARS, default 1200)
+    - hypothesis/claim (NLI_LLM_HYPOTHESIS_MAX_CHARS, default 500)
+  P-1 FIXED: was settings.llm.context_manager_provider + hardcoded max_tokens=120;
+    now passes agent="nli" so model/provider/max_tokens come from agent_models.
+    Validated real: entailment fixture -> entailment 1.0, contradiction -> 1.0.
 
 ### 3g. Intent Router Agent  (agent="router")  -- tier-1 of context-poor cascade (P-7)
   Model:   nvidia/nemotron-3-nano-30b-a3b (agent_models.router, max_tokens=256 —
@@ -427,8 +429,9 @@ Passed: build_auto_context() -> chat.py -> policy.plan() via gap_spec= param.
   8.  Agent routing is per-call (agent= param) NOT per-session.
   9.  _eff_msg is used for retrieval. Raw message is used for _answer_mode().
       These are intentionally separate -- do not conflate.
-  10. NLI agent uses context_manager_provider directly, not agent_models routing.
-      (Known gap -- see section 3f.)
+  10. NLI agent is routed via agent_models["nli"] (agent="nli") since P-1.
+      HF MNLI (memory.nli_model) remains the primary NLI/factuality authority;
+      the agent="nli" LLM path is a fallback only. See section 3f.
   11. Do NOT start local GPU services: llm, worker-gpu, models-init, rebel-extractor.
   12. Do NOT restart Docker, containerd, prune networks, stop unrelated containers,
       or reboot host without explicit user approval.
@@ -457,8 +460,11 @@ Passed: build_auto_context() -> chat.py -> policy.plan() via gap_spec= param.
     - Engineering rule 13 (NO HARDCODING) established; all router knobs env-backed.
     - Validated: 17/17 router unit tests, 36/36 search_agent regression, real
       NVIDIA nano + HF MNLI smoke (incl. options-hint path: "b" -> prior_context).
+    - P-1 FIXED (section 3f): _llm_nli now routes via agent_models["nli"]
+      (agent="nli"), system prompt from factory, env-backed truncation; nli entry
+      added to agent_models (super-49b, max_tokens=1024). HF MNLI stays primary.
     - Git: baseline of all uncommitted 2026-06 work committed (05803c0) + merged
-      to main (1df7386); P-7 on feat/zero-shot-intent-router.
+      to main (1df7386); P-7 + P-1 on feat/zero-shot-intent-router (PR #1).
 
   2026-06-12 (session 2):
     - Dynamic system prompt factory: app/prompts/agent_prompts.py

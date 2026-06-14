@@ -209,9 +209,10 @@ Rule 13 is NOT yet satisfied for the legacy surface: many array/char caps are in
 Full scan of services/api/app grouped by the config knob they SHOULD become. (✅ = a config
 home already exists and the literal should just reference it; ⬜ = needs a new named field.)
 
-  G1 Conversation-window sizes (how much history fed downstream)
-     recent_messages(3,4000) + recent_turns[-6:]/[:6]/[:300] (search_agent ~1829/949/945),
-     working_buffer K=8 ✅(memory.working_buffer_turns). → MemoryWindowCfg{turns_fetch, per_turn_chars}.
+  G1 Conversation-window sizes (how much history fed downstream)  ✅ DONE 2026-06-14
+     env-backed named constants in search_agent.py: INTENT_RECENT_MESSAGES(3),
+     INTENT_RECENT_TOKEN_BUDGET(4000), INTENT_RECENT_TURNS_MAX(6), INTENT_TURN_CHARS(300),
+     INTENT_SUMMARY_CHARS(300), INTENT_RECENT_QUERIES_MAX(4). (working_buffer K=8 already ✅.)
   G2 Per-item text-truncation char budgets (prompt rendering)
      store.py [:1000]/[:700]/[:500]/[:260]/[:180]/[:160]; policy render [:900]/[:700]/[:520]/[:280];
      chat [:360]/[:300]/[:497]/[:217]; agent_prompts [:300]/[:180]; nli premise[:1200]/hyp[:500] ✅(env).
@@ -219,10 +220,13 @@ home already exists and the literal should just reference it; ⬜ = needs a new 
   G3 Retrieval result/candidate counts (k / limits)
      bm25 k=50 ✅(os.bm25_k); memory_k/triplet_k/web_k/auto_context_k ✅; inline limit=4/6/8/10/12/16/18/24,
      pmcids[:5], external_queries[:4/6]. → RetrievalCfg (exists; call-site literals must reference it).
-  G4 Entity/term/anchor list caps
-     ctx_entities[:40]→[:30] (ner), active_terms[:8/12], anchors[:10/12], synonyms[:4], alias[:3],
-     missing_entities[:4], task_terms[:16/18], normalized[:8]. → VocabGroundingCfg + prioritize key
-     entities to front before the cap (the P-8 ner item).
+  G4 Entity/term/anchor list caps  ✅ PARTIAL DONE 2026-06-14 (search_agent grounding + active_terms)
+     search_agent.py env constants: ACTIVE_TERMS_MAX(8), GROUNDING_QUERY_ANCHOR_LIMIT(14),
+     GROUNDING_QUERY_IDEA_LIMIT(8), GROUNDING_QUERY_ENTITIES_MAX(16), GROUNDING_SNIPPET_SCAN_MAX(20),
+     GROUNDING_TERMS_PER_SNIPPET(12), GROUNDING_CTX_ENTITIES_MAX(40), GROUNDING_CTX_ENTITIES_PROMPT_MAX(30),
+     GROUNDING_MESSAGE_CHARS(400); + confirmed entities now prioritized to the front before the cap
+     (P-8 ner item). REMAINING: policy.py term-join caps (synonyms[:4], alias[:3], task_terms[:16/18],
+     normalized[:8], active_terms[:8/12]) — fold into G2/G3 sweep.
   G5 Memory-item fetch/render counts
      reflections[:3], episodic_summaries(3), latest_traces(3), ideas[:8], policy_notes(4),
      landmarks. → MemoryFetchCfg (some live in MemoryCfg; unify).

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import copy
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Awaitable, Callable, Iterable, List
@@ -25,6 +26,34 @@ from app.memory.vocabulary_store import VocabularyStore
 
 SearchFn = Callable[[str, str, dict[str, Any], int], Awaitable[List[dict[str, Any]]]]
 LevelSearchFn = Callable[[str, str, str, dict[str, Any], int], Awaitable[List[dict[str, Any]]]]
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+# ── Configurable caps (no hardcoding — ARCHITECTURE.md rule 13) ──────────────
+# G1: intent-resolution conversation-window sizes (build_auto_context +
+# resolve_message_intent). How much recent history reaches the intent layer.
+INTENT_RECENT_MESSAGES = _env_int("INTENT_RECENT_MESSAGES", 3)        # turns fetched for context-poor
+INTENT_RECENT_TOKEN_BUDGET = _env_int("INTENT_RECENT_TOKEN_BUDGET", 4000)
+INTENT_RECENT_TURNS_MAX = _env_int("INTENT_RECENT_TURNS_MAX", 6)      # turns passed to the intent LLM
+INTENT_TURN_CHARS = _env_int("INTENT_TURN_CHARS", 300)               # per-turn char budget
+INTENT_SUMMARY_CHARS = _env_int("INTENT_SUMMARY_CHARS", 300)
+INTENT_RECENT_QUERIES_MAX = _env_int("INTENT_RECENT_QUERIES_MAX", 4)
+# G4: entity/term grounding caps (llm_ground_entities + active-terms reuse).
+ACTIVE_TERMS_MAX = _env_int("ACTIVE_TERMS_MAX", 8)
+GROUNDING_QUERY_ANCHOR_LIMIT = _env_int("GROUNDING_QUERY_ANCHOR_LIMIT", 14)
+GROUNDING_QUERY_IDEA_LIMIT = _env_int("GROUNDING_QUERY_IDEA_LIMIT", 8)
+GROUNDING_QUERY_ENTITIES_MAX = _env_int("GROUNDING_QUERY_ENTITIES_MAX", 16)
+GROUNDING_SNIPPET_SCAN_MAX = _env_int("GROUNDING_SNIPPET_SCAN_MAX", 20)
+GROUNDING_TERMS_PER_SNIPPET = _env_int("GROUNDING_TERMS_PER_SNIPPET", 12)
+GROUNDING_CTX_ENTITIES_MAX = _env_int("GROUNDING_CTX_ENTITIES_MAX", 40)
+GROUNDING_CTX_ENTITIES_PROMPT_MAX = _env_int("GROUNDING_CTX_ENTITIES_PROMPT_MAX", 30)
+GROUNDING_MESSAGE_CHARS = _env_int("GROUNDING_MESSAGE_CHARS", 400)
 
 
 
@@ -940,13 +969,13 @@ async def resolve_message_intent(
     recent_turns: list[str] = []
     for _n in (notes or [])[:8]:
         if not active_terms and _n.get("active_terms"):
-            active_terms = list(_n["active_terms"])[:8]
+            active_terms = list(_n["active_terms"])[:ACTIVE_TERMS_MAX]
         if not summary and _n.get("summary"):
-            summary = str(_n["summary"])[:300]
+            summary = str(_n["summary"])[:INTENT_SUMMARY_CHARS]
         if _n.get("query"):
             recent_queries.append(str(_n["query"]))
         if not recent_turns and _n.get("recent_turns"):
-            recent_turns = list(_n["recent_turns"])[:6]
+            recent_turns = list(_n["recent_turns"])[:INTENT_RECENT_TURNS_MAX]
     if not active_terms and not recent_queries and not recent_turns:
         return None
     _has_wbuf = bool(recent_turns)
@@ -962,7 +991,7 @@ async def resolve_message_intent(
                 f"User message: {message!r}\n\n"
                 f"Prior conversation summary: {summary or 'none'}\n"
                 f"Active research terms: {active_terms}\n"
-                f"Prior search queries (recent first): {recent_queries[:4]}\n"
+                f"Prior search queries (recent first): {recent_queries[:INTENT_RECENT_QUERIES_MAX]}\n"
                 + (
                     "Recent conversation turns (working buffer):\n"
                     + "\n".join(recent_turns) + "\n"
@@ -1708,16 +1737,16 @@ async def llm_ground_entities(
     entity_map for downstream gap-steering and feedback-term filtering.
     """
     query_ents = list(dict.fromkeys(
-        _query_anchor_terms(message, limit=14)
-        + [_canonical_search_anchor(e) for e in extract_ideas(message, limit=8)
+        _query_anchor_terms(message, limit=GROUNDING_QUERY_ANCHOR_LIMIT)
+        + [_canonical_search_anchor(e) for e in extract_ideas(message, limit=GROUNDING_QUERY_IDEA_LIMIT)
            if _canonical_search_anchor(e)
            and _canonical_search_anchor(e) not in PUZZLE_NODE_STOP_TERMS]
-    ))[:16]
+    ))[:GROUNDING_QUERY_ENTITIES_MAX]
     if not query_ents or not snippets:
         return
 
     ctx_pool = []
-    for item in snippets[:20]:
+    for item in snippets[:GROUNDING_SNIPPET_SCAN_MAX]:
         for _etype, _eids in (item.get("pubtator_entities") or {}).items():
             ctx_pool.extend(f"{_etype}:{eid}" for eid in (_eids or []))
         text = " ".join(
@@ -1725,15 +1754,19 @@ async def llm_ground_entities(
             for f in ("title", "sentence_text", "text", "snippet", "subject", "object")
             if item.get(f)
         )
-        ctx_pool.extend(important_terms(text, 12))
-    ctx_entities = list(dict.fromkeys(ctx_pool))[:40]
-    if not ctx_entities:
-        return
+        ctx_pool.extend(important_terms(text, GROUNDING_TERMS_PER_SNIPPET))
 
     _conf = getattr(gap_spec, "confirmed_entities", None)
     if _conf is None and isinstance(gap_spec, dict):
         _conf = gap_spec.get("confirmed_entities") or []
-    _ner_confirmed_count = len(_conf or [])
+    _conf = list(_conf or [])
+    # G4/P-8: prioritize confirmed entities to the front so they survive the cap
+    # (a relevant entity ranked beyond the cap would otherwise be silently dropped).
+    ctx_entities = list(dict.fromkeys([*_conf, *ctx_pool]))[:GROUNDING_CTX_ENTITIES_MAX]
+    if not ctx_entities:
+        return
+
+    _ner_confirmed_count = len(_conf)
     _ner_is_discovery = _ner_confirmed_count == 0
     messages = [
         {
@@ -1743,9 +1776,9 @@ async def llm_ground_entities(
         {
             "role": "user",
             "content": (
-                f"User query: {message[:400]}\n"
+                f"User query: {message[:GROUNDING_MESSAGE_CHARS]}\n"
                 f"Query entities to classify: {query_ents}\n"
-                f"Context entity pool (all retrieved sources): {ctx_entities[:30]}\n\n"
+                f"Context entity pool (all retrieved sources): {ctx_entities[:GROUNDING_CTX_ENTITIES_PROMPT_MAX]}\n\n"
                 'Return: {"grounded": [{"entity": str, "status": "confirmed|synonym|absent",'
                 ' "context_match": str_or_null}]}'
             ),
@@ -1829,13 +1862,13 @@ async def build_auto_context(
     # the actual model output (e.g. 'a) ... b) ...') before the vague reply.
     if _is_context_poor(message):
         try:
-            _recent = await store.recent_messages(session_id, 3, token_budget=4000)
+            _recent = await store.recent_messages(session_id, INTENT_RECENT_MESSAGES, token_budget=INTENT_RECENT_TOKEN_BUDGET)
             if _recent:
                 _turns_text = [
                     f"[Turn {r.get('turn_index', i + 1)}] "
                     f"{r.get('role', '?')}: "
-                    f"{str(r.get('content', ''))[:300]}"
-                    for i, r in enumerate(_recent[-6:])
+                    f"{str(r.get('content', ''))[:INTENT_TURN_CHARS]}"
+                    for i, r in enumerate(_recent[-INTENT_RECENT_TURNS_MAX:])
                 ]
                 notes = [
                     *notes,

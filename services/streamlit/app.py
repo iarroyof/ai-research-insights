@@ -224,7 +224,15 @@ def selected_model_payload(prefix: str, item: dict) -> dict:
 
 
 def extract_clarification_options(text: str) -> list:
-    """Parse lettered option lists (a/b/c...) from model response text."""
+    """Parse lettered option lists (a/b/c...) from model response text.
+
+    SHARED CONTRACT: the same detection rule (lettered, >=2, consecutive from 'a')
+    is mirrored in the backend intent router
+    (services/api/app/memory/intent_router.py::_text_offers_lettered_options),
+    which uses it to bias context-poor intent toward prior_context. Keep both in
+    sync so the UI checkbox launch and backend routing agree on what a
+    multi-option clarification is.
+    """
     lines = text.split("\n")
     options = []
     opt_re = re.compile(r"^\s*\(?([a-z])\)?[.:\)]\s*(.+)", re.IGNORECASE)

@@ -39,34 +39,109 @@ from app.prompts.agent_prompts import (
 from app.services import zero_shot
 
 
-def _conf_threshold() -> float:
-    """Minimum router confidence to act without escalating to the 120b."""
+# ── Configurable constants (no hardcoded literals — ARCHITECTURE.md rule 13) ──
+# All behavioural knobs are env-overridable named constants resolved once at
+# import, matching the os.getenv pattern used by zero_shot.py and nli.py.
+
+def _env_float(name: str, default: float) -> float:
     try:
-        return float(os.getenv("ROUTER_CONF_THRESHOLD", "0.6"))
+        return float(os.getenv(name, str(default)))
     except (TypeError, ValueError):
-        return 0.6
+        return default
 
 
-# Resolved once at import; env-overridable for eval sweeps.
-ROUTER_CONF_THRESHOLD: float = _conf_threshold()
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+# Minimum router confidence to act (resolve prior_context) without escalating
+# to the 120b context_manager.
+ROUTER_CONF_THRESHOLD: float = _env_float("ROUTER_CONF_THRESHOLD", 0.6)
+# Confidence assigned when the NIM returns a valid label as JSON but omits a
+# numeric confidence field.
+NIM_DEFAULT_CONF: float = _env_float("ROUTER_NIM_DEFAULT_CONF", 0.85)
+# Confidence assigned when the NIM output is not valid JSON but a bare label
+# token is recovered from the text.
+NIM_FALLBACK_CONF: float = _env_float("ROUTER_NIM_FALLBACK_CONF", 0.7)
+# How many trailing turns of the working buffer to use as the premise context.
+PREMISE_TURNS: int = _env_int("ROUTER_PREMISE_TURNS", 2)
+# Max characters of premise context fed to either backend.
+PREMISE_MAX_CHARS: int = _env_int("ROUTER_PREMISE_MAX_CHARS", 800)
+# How many leading notes to scan for the working-buffer recent_turns entry.
+NOTES_SCAN_LIMIT: int = _env_int("ROUTER_NOTES_SCAN_LIMIT", 8)
+
+# Maximum lettered options considered when detecting a clarification-question
+# turn. NOT env-backed on purpose: this mirrors the frontend checkbox trigger
+# (services/streamlit/app.py::extract_clarification_options) and the two must
+# agree on what counts as a multi-option clarification, so it stays a fixed,
+# in-sync named constant rather than an independently-tunable knob.
+_MAX_OPTION_LETTERS: int = 5
 
 _LABEL_RE = re.compile(r"prior_context|augment_prior|new_query")
+
+# Mirrors services/streamlit/app.py::extract_clarification_options. Keep the
+# regex and the consecutive-from-'a' rule below in sync with that function so
+# backend intent routing and the UI checkbox launch agree on the same signal.
+_OPTION_RE = re.compile(r"^\s*\(?([a-z])\)?[.:\)]\s*(.+)", re.IGNORECASE)
+
+
+def _text_offers_lettered_options(text: str) -> bool:
+    """True when the text presents a lettered option list (a, b, c, ...).
+
+    Same definition as the frontend's extract_clarification_options: at least
+    two options, starting at 'a' and consecutive. This is the structural signal
+    that the assistant asked a multiple-option clarification question.
+    """
+    letters: list[str] = []
+    for line in (text or "").split("\n"):
+        match = _OPTION_RE.match(line.rstrip())
+        if match and match.group(2).strip():
+            letters.append(match.group(1).lower())
+    if len(letters) < 2:
+        return False
+    return letters[0] == "a" and all(
+        ord(letters[i]) == ord(letters[i - 1]) + 1
+        for i in range(1, min(len(letters), _MAX_OPTION_LETTERS))
+    )
 
 
 def _recent_turn_text(notes: list[dict[str, Any]] | None) -> str:
     """Most recent conversation turn(s) from notes, used as the NLI premise /
     generative context. Empty string when no working-buffer turns are present."""
-    for _n in (notes or [])[:8]:
+    for _n in (notes or [])[:NOTES_SCAN_LIMIT]:
         rt = _n.get("recent_turns")
         if rt:
-            tail = [str(x) for x in list(rt)[-2:]]
-            return "\n".join(tail)[:800]
+            tail = [str(x) for x in list(rt)[-PREMISE_TURNS:]]
+            return "\n".join(tail)[:PREMISE_MAX_CHARS]
     return ""
+
+
+def _prior_turn_offered_options(notes: list[dict[str, Any]] | None) -> bool:
+    """True when the most recent assistant turn presented a lettered clarification
+    option list. Reuses the same detection as the frontend checkbox launch so the
+    backend router and the UI agree on what a multi-option clarification is."""
+    return _text_offers_lettered_options(_recent_turn_text(notes))
+
+
+# Structural hint appended to the premise when the prior turn offered options.
+# Improves BOTH backends' predictive power: it raises the prior_context
+# entailment for MNLI and tells the generative NIM that a short reply is most
+# likely selecting among the offered options.
+_OPTIONS_HINT = (
+    "\n[Context signal: the assistant's previous message asked the user to choose "
+    "among lettered options (a, b, c ...). A short or selecting reply most likely "
+    "refers to those options rather than starting a new topic.]"
+)
 
 
 def _premise(message: str, notes: list[dict[str, Any]] | None) -> str:
     tail = _recent_turn_text(notes)
-    return f"{tail}\nUser: {message}" if tail else f"User: {message}"
+    hint = _OPTIONS_HINT if _prior_turn_offered_options(notes) else ""
+    base = f"{tail}\nUser: {message}" if tail else f"User: {message}"
+    return base + hint
 
 
 def _parse_nim(text: str) -> dict | None:
@@ -83,7 +158,7 @@ def _parse_nim(text: str) -> dict | None:
                 try:
                     conf = float(data.get("confidence"))
                 except (TypeError, ValueError):
-                    conf = 0.85
+                    conf = NIM_DEFAULT_CONF
                 return {
                     "intent": intent,
                     "confidence": min(1.0, max(0.0, conf)),
@@ -93,7 +168,7 @@ def _parse_nim(text: str) -> dict | None:
             pass
     match = _LABEL_RE.search(text.lower())
     if match:
-        return {"intent": match.group(0), "confidence": 0.7, "source": "nim"}
+        return {"intent": match.group(0), "confidence": NIM_FALLBACK_CONF, "source": "nim"}
     return None
 
 

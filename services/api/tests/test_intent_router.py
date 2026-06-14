@@ -36,7 +36,7 @@ class ParseNimTests(unittest.TestCase):
     def test_json_missing_confidence_defaults(self):
         r = ir._parse_nim('{"intent": "new_query"}')
         self.assertEqual(r["intent"], "new_query")
-        self.assertEqual(r["confidence"], 0.85)
+        self.assertEqual(r["confidence"], ir.NIM_DEFAULT_CONF)
 
     def test_confidence_clamped(self):
         r = ir._parse_nim('{"intent": "new_query", "confidence": 9}')
@@ -45,7 +45,7 @@ class ParseNimTests(unittest.TestCase):
     def test_label_token_fallback(self):
         r = ir._parse_nim("The intent is augment_prior here.")
         self.assertEqual(r["intent"], "augment_prior")
-        self.assertEqual(r["confidence"], 0.7)
+        self.assertEqual(r["confidence"], ir.NIM_FALLBACK_CONF)
 
     def test_invalid_returns_none(self):
         self.assertIsNone(ir._parse_nim("no idea"))
@@ -64,6 +64,40 @@ class PremiseTests(unittest.TestCase):
 
     def test_no_notes(self):
         self.assertEqual(ir._premise("yes", None), "User: yes")
+
+    def test_options_hint_added_when_prior_turn_offered_options(self):
+        prior = "Which mechanism?\na) hypoxia\nb) MDSC recruitment\nc) angiogenesis"
+        notes = [{"recent_turns": [prior]}]
+        p = ir._premise("the second one", notes)
+        self.assertIn("lettered options", p)
+
+    def test_no_options_hint_for_plain_prior_turn(self):
+        notes = [{"recent_turns": ["Assistant: EGFR drives proliferation."]}]
+        p = ir._premise("tell me more", notes)
+        self.assertNotIn("lettered options", p)
+
+
+class OptionDetectionTests(unittest.TestCase):
+    """Backend detector must agree with frontend extract_clarification_options."""
+
+    def test_detects_consecutive_lettered_options(self):
+        self.assertTrue(
+            ir._text_offers_lettered_options("a) immunosuppression\nb) mycotoxin")
+        )
+        self.assertTrue(
+            ir._text_offers_lettered_options("(a). foo\n(b). bar\n(c). baz")
+        )
+
+    def test_rejects_non_consecutive_or_single(self):
+        self.assertFalse(ir._text_offers_lettered_options("a) only one option"))
+        self.assertFalse(ir._text_offers_lettered_options("b) starts at b\nc) next"))
+        self.assertFalse(ir._text_offers_lettered_options("plain prose, no options"))
+
+    def test_prior_turn_offered_options_reads_notes(self):
+        notes = [{"recent_turns": ["pick one:\na) x\nb) y"]}]
+        self.assertTrue(ir._prior_turn_offered_options(notes))
+        self.assertFalse(ir._prior_turn_offered_options([{"recent_turns": ["no opts"]}]))
+        self.assertFalse(ir._prior_turn_offered_options(None))
 
 
 ROUTER_LABELS = ("prior_context", "new_query", "augment_prior")

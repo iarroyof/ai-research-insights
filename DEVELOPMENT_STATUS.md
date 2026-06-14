@@ -58,9 +58,16 @@
        regressed in the reverted ultra-550b experiment) now healthy (0.8175/0.7212).
        recommendations.json has forward-looking reward-shaping items (mechanism-graph
        required-node awareness; unsupported-mechanism penalization) — NOT gate blockers.
-       Remaining for FULL promotion: (a) bump current_stage in reward_shape_registry.yaml,
-       (b) optionally re-run sentinel_c (was 0.6724) with the new config for full rigor.
-       Both are the user's milestone call.
+       sentinel_c RE-RUN 2026-06-14 (run shape8_sentinel_c_p7p1p3): missed_injected_traps=0
+       BUT 8-scenario avg ~0.590 < 0.6724 baseline → REGRESSION on average reward (84 failures
+       vs sentinel_a's 51). Drags: correction_scope gen_004 0.4451, expert_hgf_met gen_003 0.5039,
+       hypoxia gen_005 0.571. Top rec (both sentinels): evidence-layer "mechanistic chain scoring
+       needs required-node awareness" — an eval/evidence gap, not obviously a config regression
+       (sentinel_a IMPROVED on the same config; single live runs have NVIDIA variance).
+       DECISION: do NOT promote — sentinel_a improved but sentinel_c did not re-clear at baseline.
+       Recommend BLOCK + diagnose the low scorers (and/or a comparison run to separate
+       config-effect from variance). Awaiting user milestone call. current_stage UNCHANGED
+       (still shape8_sentinel_a_cleared).
 
   P-3  Reward signal for intent resolution  — ✅ DONE (2026-06-13)
        plan_auto_context records intent_resolution metadata {tier, intent, source,

@@ -285,8 +285,8 @@ def render_chat():
         model_col, context_col = st.columns(2)
         use_agent_routing = st.checkbox(
             "Use server-side per-agent model routing",
-            value=False,
-            help="Each stage uses its configured model: frame->nemotron-super-49b, context_manager->nemotron-3-super-120b (reasoning=medium), answer->nemotron-super-49b, reflection->nemotron-super-49b",
+            value=True,
+            help="Default. Each stage uses its configured agent_models entry: router->nemotron-3-nano-30b, frame->nemotron-super-49b, context_manager->nemotron-3-super-120b (reasoning=medium), answer->nemotron-super-49b, reflection->nemotron-super-49b, nli->nemotron-super-49b. Uncheck to override with a single chat/context model.",
         )
         if not use_agent_routing:
             with model_col:
@@ -295,7 +295,7 @@ def render_chat():
                 use_same_model = st.checkbox("Use chat model for context manager and search agents", value=True)
                 context_model = chat_model if use_same_model else select_model("Context/search model", "context_model_choice", models)
         else:
-            st.caption("Per-agent routing active · frame: nemotron-super-49b · context: nemotron-3-super-120b (reasoning=med) · answer: nemotron-super-49b · reflection: nemotron-super-49b")
+            st.caption("Per-agent routing active (default) · router: nemotron-3-nano-30b · frame: nemotron-super-49b · context: nemotron-3-super-120b (reasoning=med) · answer: nemotron-super-49b · reflection: nemotron-super-49b · nli: nemotron-super-49b")
             chat_model = None
             context_model = None
 

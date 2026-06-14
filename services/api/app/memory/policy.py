@@ -55,6 +55,13 @@ def _env_int(name: str, default: int) -> int:
 EXTERNAL_QUERY_MAX_TOKENS = _env_int("EXTERNAL_QUERY_MAX_TOKENS", 700)   # _llm_external_query_variants
 REFLECT_MAX_TOKENS = _env_int("REFLECT_MAX_TOKENS", 160)                 # _reflect
 MAX_NLI_PAIRS_PER_CLAIM = _env_int("MAX_NLI_PAIRS_PER_CLAIM", 8)         # assess_claim_support fan-out
+# G5: memory-item fetch/render counts (how many of each memory level reaches the answer prompt).
+MEMORY_SUMMARIES_FETCH = _env_int("MEMORY_SUMMARIES_FETCH", 3)
+MEMORY_TRACES_FETCH = _env_int("MEMORY_TRACES_FETCH", 3)
+MEMORY_IDEAS_FETCH = _env_int("MEMORY_IDEAS_FETCH", 8)
+MEMORY_LANDMARKS_RENDER = _env_int("MEMORY_LANDMARKS_RENDER", 8)
+MEMORY_IDEAS_RENDER = _env_int("MEMORY_IDEAS_RENDER", 8)
+MEMORY_REFLECTIONS_RENDER = _env_int("MEMORY_REFLECTIONS_RENDER", 3)
 
 
 @dataclass
@@ -97,7 +104,7 @@ def _render_landmarks(items: list[dict]) -> str:
     if not items:
         return ""
     lines = ["Conversation landmarks:"]
-    for item in items[:8]:
+    for item in items[:MEMORY_LANDMARKS_RENDER]:
         name = item.get("name", "landmark")
         summary = (item.get("summary") or "").strip()
         if summary:
@@ -652,7 +659,7 @@ def _render_ideas(ideas: list[dict]) -> str:
     if not ideas:
         return ""
     lines = ["Vocabulary guide (known concepts -- canonical names, aliases, hierarchy):"]
-    for item in ideas[:8]:
+    for item in ideas[:MEMORY_IDEAS_RENDER]:
         idea = item.get("idea") or ""
         if not idea:
             continue
@@ -724,9 +731,9 @@ class ContextPolicy:
                 _mem_query = " ".join(str(_t) for _t in _active_terms[:8])
         memory_hits = await self.store.search_memory(session_id, _mem_query, settings.memory.memory_k)
         landmarks = await self.store.landmarks(session_id)
-        summaries = await self.store.episodic_summaries(session_id, 3)
-        latest_traces = await self.store.latest_traces(session_id, 3)
-        idea_hits = await self.store.search_ideas(session_id, _mem_query, min(8, settings.memory.memory_k), user_id=user_id)  # WP-F-2
+        summaries = await self.store.episodic_summaries(session_id, MEMORY_SUMMARIES_FETCH)
+        latest_traces = await self.store.latest_traces(session_id, MEMORY_TRACES_FETCH)
+        idea_hits = await self.store.search_ideas(session_id, _mem_query, min(MEMORY_IDEAS_FETCH, settings.memory.memory_k), user_id=user_id)  # WP-F-2
         state = state_key(important_terms(message))
         action_value_hints = await self.store.action_values(session_id, state, 3)
 
@@ -1023,7 +1030,7 @@ class ContextPolicy:
                 if isinstance(t.get("reflection"), str) and t.get("reflection")
             ]
             if reflection_lines:
-                sections.append("Recent policy reflections:\n" + "\n".join(f"- {r[:500]}" for r in reflection_lines[:3]))
+                sections.append("Recent policy reflections:\n" + "\n".join(f"- {r[:500]}" for r in reflection_lines[:MEMORY_REFLECTIONS_RENDER]))
 
         prefix = "\n\n".join(s for s in sections if s)
         selected_context = []

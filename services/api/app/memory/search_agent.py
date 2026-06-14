@@ -59,6 +59,9 @@ GROUNDING_MESSAGE_CHARS = _env_int("GROUNDING_MESSAGE_CHARS", 400)
 FRAME_REFINE_MAX_TOKENS = _env_int("FRAME_REFINE_MAX_TOKENS", 900)
 INTENT_RESOLVE_MAX_TOKENS = _env_int("INTENT_RESOLVE_MAX_TOKENS", 250)
 GROUNDING_MAX_TOKENS = _env_int("GROUNDING_MAX_TOKENS", 500)
+# G5: memory-item fetch counts (cached search plans + reused prior-frame variants).
+POLICY_NOTES_FETCH = _env_int("POLICY_NOTES_FETCH", 4)
+PRIOR_FRAME_VARIANTS = _env_int("PRIOR_FRAME_VARIANTS", 2)
 
 
 
@@ -777,7 +780,7 @@ def _is_phrase_evaluation(message: str) -> bool:
     )
 
 
-def _prior_frame_variants(notes: list[dict[str, Any]], limit: int = 2) -> list[SearchQueryVariant]:
+def _prior_frame_variants(notes: list[dict[str, Any]], limit: int = PRIOR_FRAME_VARIANTS) -> list[SearchQueryVariant]:
     candidates: list[tuple[str, str, str, str]] = []
     for note in notes:
         search_plan = note.get("search_plan") if isinstance(note, dict) else None
@@ -1851,7 +1854,7 @@ async def build_auto_context(
 ) -> dict[str, Any]:
     max_variants = max(1, int(settings.memory.auto_context_query_variants))
     k_total = max(1, int(settings.memory.auto_context_k))
-    notes = await store.search_policy_notes(session_id=session_id, limit=4)
+    notes = await store.search_policy_notes(session_id=session_id, limit=POLICY_NOTES_FETCH)
     # Inject conversation_frame into notes both for followup references AND
     # context-poor messages (short/vague, no biomedical anchors) so that
     # resolve_message_intent() has the current topic's active_terms to reason from.

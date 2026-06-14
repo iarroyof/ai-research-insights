@@ -227,9 +227,10 @@ home already exists and the literal should just reference it; ⬜ = needs a new 
      GROUNDING_MESSAGE_CHARS(400); + confirmed entities now prioritized to the front before the cap
      (P-8 ner item). REMAINING: policy.py term-join caps (synonyms[:4], alias[:3], task_terms[:16/18],
      normalized[:8], active_terms[:8/12]) — fold into G2/G3 sweep.
-  G5 Memory-item fetch/render counts
-     reflections[:3], episodic_summaries(3), latest_traces(3), ideas[:8], policy_notes(4),
-     landmarks. → MemoryFetchCfg (some live in MemoryCfg; unify).
+  G5 Memory-item fetch/render counts  ✅ DONE 2026-06-14
+     env constants: policy MEMORY_SUMMARIES_FETCH(3)/MEMORY_TRACES_FETCH(3)/MEMORY_IDEAS_FETCH(8)/
+     MEMORY_LANDMARKS_RENDER(8)/MEMORY_IDEAS_RENDER(8)/MEMORY_REFLECTIONS_RENDER(3);
+     search_agent POLICY_NOTES_FETCH(4)/PRIOR_FRAME_VARIANTS(2). 36/36 + chat_auto_context 10/10.
   G6 Provider budgets & timeouts  ✅ PARTIAL DONE 2026-06-14 (agent-output budgets)
      env constants: search_agent FRAME_REFINE_MAX_TOKENS(900)/INTENT_RESOLVE_MAX_TOKENS(250)/
      GROUNDING_MAX_TOKENS(500); policy EXTERNAL_QUERY_MAX_TOKENS(700)/REFLECT_MAX_TOKENS(160)/

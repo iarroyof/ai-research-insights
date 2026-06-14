@@ -55,18 +55,29 @@
        Current: sentinel_a cleared, sentinel_c at 0.6724.
        Action needed: run blue-demon test suite, decide promote or block+diagnose.
 
-  P-3  Reward signal for context_manager intent resolution
-       When resolve_message_intent correctly resolves intent (verified by answer
-       quality), context_manager should receive positive reward via
-       ActionValue/VocabularyStore. Not yet implemented.
+  P-3  Reward signal for intent resolution  — ✅ DONE (2026-06-13)
+       plan_auto_context records intent_resolution metadata {tier, intent, source,
+       confidence, state_key, action_key, effective_query} on AutoContextPlan; it
+       flows via plan.to_dict() -> auto_context payload -> observe_turn, which
+       credits the (state, action) = (intentres|len=BUCKET, TIER:INTENT) pair with
+       the turn reward in the existing ActionValue table (no new Q-layer). Reward
+       SIGNAL is recorded; the learning loop that reads it back to bias tier choice
+       is the documented next step. Tiers: tier1_router | tier2_120b | heuristic.
 
-  P-4  _answer_mode uses raw message -- not verified against context-poor resolved query
-       Currently intentional (answer mode is orthogonal to retrieval resolution).
-       Revisit if users report wrong answer mode for resolved queries.
+  P-4  answer_mode vs context-poor resolved query  — ✅ DONE (default off, 2026-06-13)
+       _answer_mode now accepts resolved_query; ONLY the question-type modes
+       (novice_rewrite, expert_mechanism) consider it — utterance modes (correction,
+       clarification, phrase_evaluation, diagnostic) stay on the raw message.
+       Gated by memory.answer_mode_consider_resolved_query (default FALSE → no
+       behaviour change). Enable via env ANSWER_MODE_CONSIDER_RESOLVED_QUERY=true
+       after an eval gate confirms no shape8 regression.
 
-  P-5  Prompt caching trade-off
-       Dynamic system prompts mean no cache hit per turn for 120b context_manager
-       (reasoning=medium). Monitor latency in production.
+  P-5  Prompt caching — static-prefix ordering  — ✅ DONE (2026-06-13)
+       Verified all 7 prompt factories are static-base-first (dynamic suffix last),
+       so KV-cache prefix matching holds. Added test_prompt_cache_ordering.py to
+       LOCK the invariant against future reordering. Latency still monitorable via
+       GET /chat/memory/provider-metrics. (Ordering was already correct on main;
+       this pins it.)
 
   P-6  Cascaded routing for context_manager cost (proposal)
        resolve_message_intent() input is ~700-1100 tokens — NOT a context-window

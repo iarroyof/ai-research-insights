@@ -449,6 +449,20 @@ Passed: build_auto_context() -> chat.py -> policy.plan() via gap_spec= param.
 
 ## 12. Changelog
 
+  2026-06-13 (batch 2 — post-merge follow-ups):
+    - P-3 DONE: intent-resolution reward attribution. AutoContextPlan carries
+      intent_resolution {tier, intent, source, confidence, state_key, action_key,
+      effective_query}; observe_turn credits (intentres|len=BUCKET, TIER:INTENT)
+      in the existing ActionValue table with the turn reward.
+    - P-4 DONE (default off): _answer_mode question-type modes (novice/mechanism)
+      may consider the resolved query for context-poor replies, gated by
+      memory.answer_mode_consider_resolved_query. Utterance modes stay raw-message.
+    - P-5 DONE: verified all factories static-prefix-first; added
+      test_prompt_cache_ordering.py to lock the KV-cache invariant.
+    - Streamlit: "Use server-side per-agent model routing" now DEFAULT ON; help/
+      caption updated to include router + nli agents.
+    - Synced blue-demon main with merged origin/main (PR #1 -> 0aca9f9).
+
   2026-06-13:
     - P-7 tier-1 zero-shot intent router (section 3g): nano NIM primary + HF MNLI
       fallback, inserted before the 120b in plan_auto_context. prior_context

@@ -114,6 +114,9 @@ memory:
   auto_context_query_variants: ${AUTO_CONTEXT_QUERY_VARIANTS:-5}
   auto_context_llm_refine: ${AUTO_CONTEXT_LLM_REFINE:-true}
   auto_context_llm_notes: ${AUTO_CONTEXT_LLM_NOTES:-true}
+  # P-4: default off — enable after an eval gate to let question-type answer
+  # modes reconsider the resolved query for context-poor replies.
+  answer_mode_consider_resolved_query: ${ANSWER_MODE_CONSIDER_RESOLVED_QUERY:-false}
   contradiction_threshold: 0.35
   nli_enabled: true
   nli_provider: ${NLI_PROVIDER:-hf_api}

@@ -1223,6 +1223,19 @@ class ContextPolicy:
                 reward_score=float(reward["score"]),
                 shared=bool(settings.memory.shared_policy_enabled),
             )
+            # P-3: credit the intent-resolution decision (tier-1 router / 120b /
+            # heuristic) for context-poor turns with this turn's reward, so the
+            # system can learn which resolution strategy pays off. Uses the same
+            # ActionValue table (no new Q-layer — engineering rule 1/9).
+            _ir = search_plan.get("intent_resolution") or {}
+            if _ir.get("state_key") and _ir.get("action_key"):
+                await self.store.update_action_value(
+                    session_id=session_id,
+                    state_key=str(_ir["state_key"]),
+                    action_key=str(_ir["action_key"]),
+                    reward_score=float(reward["score"]),
+                    shared=bool(settings.memory.shared_policy_enabled),
+                )
             note_parts = [
                 str(search_plan.get("planner_note") or "").strip(),
                 str(search_plan.get("note") or "").strip(),
